@@ -37,3 +37,7 @@ sh deploy.sh                     # test install over ssh (host alias "rmpp")
 - [ ] Hide on-screen keys while a Bluetooth keyboard is connected (keep the format bar)
 - [ ] On-screen indicator when the input language changes
 - [ ] Vellum package (install, remove, `vellum reenable` after OS updates)
+
+## License
+
+GPL-3.0-only. See [LICENSE](LICENSE).
