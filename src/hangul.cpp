@@ -15,7 +15,9 @@
 #include <QtCore/QTimer>
 #include <QtCore/QMetaMethod>
 #include <QtGui/QWindow>
+#include <QtQml/QQmlComponent>
 #include <QtQml/QQmlContext>
+#include <QtQml/QQmlPropertyMap>
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
@@ -90,6 +92,10 @@ QString render(const Parsed &p) {
     return QString(QChar(p.cho ? p.cho : p.jung));
 }
 
+// Input language for physical keyboards, shared with the on-screen keyboard and the indicator.
+bool g_korean = false;
+void setKorean(bool on, const char *why);
+
 class HangulFilter : public QObject {
 public:
     using QObject::QObject;
@@ -150,8 +156,21 @@ private:
         if (ownSend) return false;
         if (e == lastEvent && e->commitString() == lastSet) return false;  // re-delivered
         if (obj != QGuiApplication::focusObject()) return false;
-        const QString commit = e->commitString();
+        QString commit = e->commitString();
         const bool plain = e->preeditString().isEmpty() && e->replacementLength() == 0;
+
+        // Type Folio keys can reach the text field as input-method commits (xochitl's own input context)
+        // rather than key events. In Korean mode, map a single Latin letter to its 2-beolsik jamo here too.
+        if (g_korean && plain && commit.size() == 1) {
+            const char16_t c = commit.at(0).unicode();
+            char16_t j = 0;
+            if (c >= u'a' && c <= u'z') j = jamoForKey(Qt::Key_A + (c - u'a'), false);
+            else if (c >= u'A' && c <= u'Z') j = jamoForKey(Qt::Key_A + (c - u'A'), true);
+            if (j) {
+                commit = QString(QChar(j));
+                e->setCommitString(commit);
+            }
+        }
 
         if (!(plain && commit.size() == 1 && isJamo(commit.at(0).unicode()))) {
             // Empty commit replacing the previous char acts as a backspace.
@@ -214,7 +233,6 @@ private:
     }
 
     // ---- physical keyboard (Type Folio / Bluetooth) ----
-    bool korean = false;          // physical keyboard mode, toggled by Ctrl+Space or right Alt / Cmd
     ulong lastToggleTs = ~0UL;
     bool debug = qEnvironmentVariableIntValue("HANGUL_DEBUG") != 0;
 
@@ -251,17 +269,15 @@ private:
         if (k->key() == Qt::Key_Space && (k->modifiers() & ~Qt::KeypadModifier) == Qt::ControlModifier) {
             if (!k->isAutoRepeat() && k->timestamp() != lastToggleTs) {
                 lastToggleTs = k->timestamp();
-                korean = !korean;
+                setKorean(!g_korean, "key");
                 reset();
-                qWarning("[hangul] physical keyboard: %s", korean ? "Korean" : "English");
             }
             return true;
         }
         if (isToggleKey(k)) {
             if (atFocus && !k->isAutoRepeat()) {
-                korean = !korean;
+                setKorean(!g_korean, "key");
                 reset();
-                qWarning("[hangul] physical keyboard: %s", korean ? "Korean" : "English");
             }
             return false;
         }
@@ -271,7 +287,7 @@ private:
             return onBackspace(obj);
 
         const auto mods = k->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
-        if (korean && mods == Qt::NoModifier) {
+        if (g_korean && mods == Qt::NoModifier) {
             if (char16_t j = jamoForKey(k->key(), k->modifiers() & Qt::ShiftModifier)) {
                 QInputMethodEvent im;
                 im.setCommitString(QString(QChar(j)));
@@ -301,15 +317,32 @@ private:
     }
 };
 
-// True when a Bluetooth or USB keyboard is attached (bus 0005 / 0003 with a kbd handler).
-bool externalKeyboardPresent() {
+// External (Bluetooth bus 0005 / USB bus 0003) keyboards now attached, by their MAC/serial ("U: Uniq=").
+QStringList externalKeyboards() {
     QFile f(QStringLiteral("/proc/bus/input/devices"));
-    if (!f.open(QIODevice::ReadOnly)) return false;
-    const QList<QByteArray> blocks = f.readAll().split('\n');
+    if (!f.open(QIODevice::ReadOnly)) return {};
+    QStringList out;
     bool ext = false;
-    for (const QByteArray &line : blocks) {
-        if (line.startsWith("I:")) ext = line.contains("Bus=0005") || line.contains("Bus=0003");
-        else if (line.startsWith("H:") && ext && line.contains("kbd")) return true;
+    QString uniq;
+    const QList<QByteArray> lines = f.readAll().split('\n');
+    for (const QByteArray &line : lines) {
+        if (line.startsWith("I:")) { ext = line.contains("Bus=0005") || line.contains("Bus=0003"); uniq.clear(); }
+        else if (line.startsWith("U: Uniq=")) uniq = QString::fromLatin1(line.mid(8)).trimmed().toUpper();
+        else if (line.startsWith("H:") && ext && line.contains("kbd")) out << (uniq.isEmpty() ? QStringLiteral("?") : uniq);
+    }
+    return out;
+}
+
+bool externalKeyboardPresent() { return !externalKeyboards().isEmpty(); }
+
+// Keyboards set to "Type Folio mode" in the Bluetooth page (rmpp-bt writes this file: one "ADDRESS=folio" per line).
+bool anyFolioKeyboard(const QStringList &present) {
+    QFile f(QStringLiteral("/home/root/.config/rmpp-bt/keyboards.conf"));
+    if (!f.open(QIODevice::ReadOnly)) return false;
+    const QList<QByteArray> lines = f.readAll().split('\n');
+    for (const QByteArray &line : lines) {
+        const QList<QByteArray> kv = line.trimmed().split('=');
+        if (kv.size() == 2 && kv[1] == "folio" && present.contains(QString::fromLatin1(kv[0]).toUpper())) return true;
     }
     return false;
 }
@@ -343,33 +376,145 @@ QObject *findKeyboardInfo() {
     return nullptr;
 }
 
-void syncExternalKeyboard() {
-    static int last = -1;
-    static bool loggedMissing = false;
-    const bool present = externalKeyboardPresent();
-    if (int(present) == last) return;
-    QObject *info = findKeyboardInfo();
-    if (!info) {
-        if (!loggedMissing) qWarning("[hangul] KeyboardInfo not found yet");
-        loggedMissing = true;
-        return;
-    }
+QQuickItem *findByClassPrefix(QQuickItem *root, const char *prefix, int depth = 0) {
+    if (!root || depth > 200) return nullptr;
+    if (qstrncmp(root->metaObject()->className(), prefix, qstrlen(prefix)) == 0) return root;
+    const auto kids = root->childItems();
+    for (QQuickItem *k : kids)
+        if (QQuickItem *f = findByClassPrefix(k, prefix, depth + 1)) return f;
+    return nullptr;
+}
+
+QQuickItem *findKeyboardPanel() {
+    for (QWindow *w : QGuiApplication::allWindows())
+        if (auto *qw = qobject_cast<QQuickWindow *>(w))
+            if (QQuickItem *p = findByClassPrefix(qw->contentItem(), "KeyboardPanel")) return p;
+    return nullptr;
+}
+
+bool setFakeConnected(QObject *info, bool on) {
     const QMetaObject *mo = info->metaObject();
-    int idx = -1;
-    for (int i = 0; i < mo->methodCount(); ++i)
-        if (mo->method(i).name() == "setFakeKeyboardConnected") { idx = i; break; }
-    if (idx < 0) { qWarning("[hangul] setFakeKeyboardConnected missing on %s", mo->className()); last = present; return; }
-    QMetaMethod m = mo->method(idx);
-    bool ok = (m.parameterCount() == 1) ? m.invoke(info, Qt::DirectConnection, Q_ARG(bool, present))
-                                        : (present ? m.invoke(info, Qt::DirectConnection) : false);
-    qWarning("[hangul] external keyboard %s -> %s(%s) %s; keyboardConnected=%s", present ? "present" : "gone",
-             m.methodSignature().constData(), present ? "true" : "false", ok ? "ok" : "FAILED",
-             info->property("keyboardConnected").toBool() ? "true" : "false");
-    last = present;
+    for (int i = 0; i < mo->methodCount(); ++i) {
+        QMetaMethod m = mo->method(i);
+        if (m.name() != "setFakeKeyboardConnected") continue;
+        return m.parameterCount() == 1 ? m.invoke(info, Qt::DirectConnection, Q_ARG(bool, on))
+                                       : (on && m.invoke(info, Qt::DirectConnection));
+    }
+    return false;
+}
+
+// Modes while an external keyboard is attached:
+//  keys  (default): fold only the on-screen keys (KeyboardPanel.keyboardConnected); the bottom format bar stays.
+//  folio (per keyboard, set in the Bluetooth page): xochitl treats it as a Type Folio (setFakeKeyboardConnected).
+void syncExternalKeyboard() {
+    enum Mode { None, Keys, Folio };
+    static Mode current = None;
+    static bool fakeOn = false;
+    const QStringList present = externalKeyboards();
+    const Mode want = present.isEmpty() ? None : (anyFolioKeyboard(present) ? Folio : Keys);
+
+    QObject *info = findKeyboardInfo();
+    if (info) {
+        const bool needFake = (want == Folio);
+        if (needFake != fakeOn && setFakeConnected(info, needFake)) fakeOn = needFake;
+    }
+    if (QQuickItem *panel = findKeyboardPanel()) {
+        const bool realFolio = info && !fakeOn && info->property("keyboardConnected").toBool();
+        const bool fold = (want != None) || realFolio || fakeOn;
+        if (panel->property("keyboardConnected").toBool() != fold) panel->setProperty("keyboardConnected", fold);
+    }
+    if (want != current) {
+        qWarning("[hangul] external keyboard: %s", want == None ? "none" : want == Keys ? "keys folded" : "Type Folio mode");
+        current = want;
+    }
+}
+
+// ---- input language: shared by physical keyboards, the on-screen keyboard and the indicator ----
+
+QQmlPropertyMap *g_state = nullptr;      // "korean" (bool) for QML, "command" written by QML
+QString g_lastVkLanguage;                // on-screen keyboard language seen last
+QString g_latinLanguage = QStringLiteral("en_US");
+
+QObject *findVirtualKeyboard() {
+    QQuickItem *panel = findKeyboardPanel();
+    return panel ? panel->property("virtualKeyboard").value<QObject *>() : nullptr;
+}
+
+void setKorean(bool on, const char *why) {
+    if (g_korean != on) qWarning("[hangul] input language: %s (%s)", on ? "Korean" : "English", why);
+    g_korean = on;
+    if (g_state) g_state->insert(QStringLiteral("korean"), on);
+    // Keep the on-screen keyboard on the same language (only if Korean is one of its enabled languages).
+    if (qstrcmp(why, "screen") == 0) return;
+    if (QObject *vk = findVirtualKeyboard()) {
+        const QString cur = vk->property("language").toString();
+        const QString want = on ? QStringLiteral("ko_KR") : g_latinLanguage;
+        const QStringList langs = vk->property("languages").toStringList();
+        if (cur != want && (langs.isEmpty() || langs.contains(want)) && vk->setProperty("language", want))
+            g_lastVkLanguage = want;
+    }
+}
+
+// Follow the globe key: when the on-screen language changes, the physical keyboard follows.
+void followScreenLanguage() {
+    QObject *vk = findVirtualKeyboard();
+    if (!vk) return;
+    const QString lang = vk->property("language").toString();
+    if (lang.isEmpty() || lang == g_lastVkLanguage) return;
+    g_lastVkLanguage = lang;
+    if (lang != QLatin1String("ko_KR")) g_latinLanguage = lang;
+    setKorean(lang == QLatin1String("ko_KR"), "screen");
+}
+
+// "한" / "EN" indicator on the bottom format bar, left of its close button; tap to switch.
+const char *kIndicatorQml = R"QML(
+import QtQuick
+Rectangle {
+    width: 76; height: 56; radius: 10
+    color: hangul.korean ? "white" : "black"
+    border.color: "white"; border.width: 2
+    anchors.right: parent.right; anchors.rightMargin: 112
+    anchors.verticalCenter: parent.verticalCenter
+    z: 5
+    Text {
+        anchors.centerIn: parent
+        text: hangul.korean ? "한" : "EN"
+        color: hangul.korean ? "black" : "white"
+        font.pixelSize: 30; font.bold: true
+    }
+    MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: hangul.command = "toggle#" + Date.now() }
+}
+)QML";
+
+void syncIndicator() {
+    for (QWindow *w : QGuiApplication::allWindows()) {
+        auto *qw = qobject_cast<QQuickWindow *>(w);
+        if (!qw) continue;
+        QQuickItem *bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
+        if (!bar || bar->property("_hangulBadge").toBool()) continue;
+        bar->setProperty("_hangulBadge", true);
+        QQmlEngine *eng = qmlEngine(bar);
+        if (!eng) continue;
+        auto *ctx = new QQmlContext(eng->rootContext(), bar);
+        ctx->setContextProperty(QStringLiteral("hangul"), g_state);
+        QQmlComponent comp(eng);
+        comp.setData(QByteArray(kIndicatorQml), QUrl(QStringLiteral("qrc:/hangul/Indicator.qml")));
+        QObject *o = comp.beginCreate(ctx);
+        auto *item = qobject_cast<QQuickItem *>(o);
+        if (!item) {
+            for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
+            delete o;
+            continue;
+        }
+        item->setParentItem(bar);
+        item->setParent(bar);
+        comp.completeCreate();
+        qWarning("[hangul] indicator added to the format bar");
+    }
 }
 
 void hangulInit() {
-    const char *rcc = qEnvironmentVariableIsSet("HANGUL_RCC") ? nullptr : "/usr/lib/hangul/ko_KR.rcc";
+    const char *rcc = qEnvironmentVariableIsSet("HANGUL_RCC") ? nullptr : "/usr/lib/rmpp-korean/ko_KR.rcc";
     QString path = rcc ? QString::fromLatin1(rcc) : qEnvironmentVariable("HANGUL_RCC");
     bool ok = QResource::registerResource(path);
     qWarning("[hangul] layout %s: %s", qPrintable(path), ok ? "registered" : "FAILED");
@@ -377,9 +522,19 @@ void hangulInit() {
     auto *filter = new HangulFilter(app);
     app->installEventFilter(filter);
     // Treat a Bluetooth/USB keyboard like the Type Folio: keys hidden, format bar kept.
+    g_state = new QQmlPropertyMap(app);
+    g_state->insert(QStringLiteral("korean"), false);
+    g_state->insert(QStringLiteral("command"), QString());
+    QObject::connect(g_state, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
+        if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) setKorean(!g_korean, "indicator");
+    });
     auto *timer = new QTimer(filter);
-    QObject::connect(timer, &QTimer::timeout, filter, [] { syncExternalKeyboard(); });
-    timer->start(2000);
+    QObject::connect(timer, &QTimer::timeout, filter, [] {
+        syncExternalKeyboard();
+        followScreenLanguage();
+        syncIndicator();
+    });
+    timer->start(1500);
     qWarning("[hangul] filter installed");
 }
 

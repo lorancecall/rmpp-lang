@@ -16,7 +16,7 @@ For a Bluetooth settings page and quick-settings toggle, see [rmpp-bt](https://g
 
 `libhangul.so` is loaded into xochitl with `LD_PRELOAD` (a systemd drop-in). It registers `ko_KR.rcc`, which adds `:/misc/keyboards/ko_KR/keyboard_layout.json` next to the built-in layouts. An application event filter then rewrites single-jamo input-method commits into composed syllables, using replace-previous-character commits.
 
-xochitl starts before `/home` is mounted, so the library and layout live in `/usr/lib/hangul`. The root file system is read-only and is replaced by OS updates, so the installer has to run again after an update.
+xochitl starts before `/home` is mounted, so the library and layout live in `/usr/lib/rmpp-korean`. The root file system is read-only and is replaced by OS updates, so the installer has to run again after an update.
 
 ## Build
 
