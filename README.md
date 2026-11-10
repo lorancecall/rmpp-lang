@@ -34,7 +34,7 @@ sh deploy.sh                     # test install over ssh (host alias "rmpp")
 - [x] On-screen Korean layout and composition
 - [x] Physical keyboard toggle (Ctrl+Space, right Alt)
 - [x] Fonts
-- [ ] Hide on-screen keys while a Bluetooth keyboard is connected (keep the format bar)
+- [x] Hide on-screen keys while a Bluetooth or USB keyboard is connected (keeps the format bar; xochitl treats it like a Type Folio)
 - [ ] On-screen indicator when the input language changes
 - [ ] Vellum package (install, remove, `vellum reenable` after OS updates)
 

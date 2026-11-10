@@ -15,6 +15,10 @@
 #include <QtCore/QTimer>
 #include <QtCore/QMetaMethod>
 #include <QtGui/QWindow>
+#include <QtQml/QQmlContext>
+#include <QtQml/QQmlEngine>
+#include <QtQuick/QQuickItem>
+#include <QtQuick/QQuickWindow>
 #include <vector>
 
 namespace {
@@ -310,19 +314,31 @@ bool externalKeyboardPresent() {
     return false;
 }
 
+// Visual-tree search for an item that carries a "keyboardInfo" property (VirtualKeyboardWindow.qml).
+QObject *keyboardInfoInTree(QQuickItem *it, int depth = 0) {
+    if (!it || depth > 200) return nullptr;
+    QVariant v = it->property("keyboardInfo");
+    if (QObject *o = v.value<QObject *>()) return o;
+    const auto kids = it->childItems();
+    for (QQuickItem *k : kids)
+        if (QObject *o = keyboardInfoInTree(k, depth + 1)) return o;
+    return nullptr;
+}
+
 QObject *findKeyboardInfo() {
     const auto windows = QGuiApplication::allWindows();
     for (QWindow *w : windows) {
-        QVariant v = w->property("keyboardInfo");
-        if (QObject *o = v.value<QObject *>()) return o;
-    }
-    for (QWindow *w : windows) {
-        const auto kids = w->findChildren<QObject *>();
-        for (QObject *c : kids) {
-            if (QByteArray(c->metaObject()->className()).contains("KeyboardInfo")) return c;
-            QVariant v = c->property("keyboardInfo");
-            if (QObject *o = v.value<QObject *>()) return o;
+        auto *qw = qobject_cast<QQuickWindow *>(w);
+        if (!qw) continue;
+        // "Use global KeyboardInfo": a context property on the engine's root context.
+        const auto kids = qw->contentItem()->childItems();
+        for (QQuickItem *k : kids) {
+            if (QQmlEngine *eng = qmlEngine(k)) {
+                QVariant v = eng->rootContext()->contextProperty(QStringLiteral("KeyboardInfo"));
+                if (QObject *o = v.value<QObject *>()) return o;
+            }
         }
+        if (QObject *o = keyboardInfoInTree(qw->contentItem())) return o;
     }
     return nullptr;
 }
