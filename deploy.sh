@@ -8,8 +8,8 @@ ssh rmpp 'mkdir -p /home/root/.local/share/fonts/rmpp-korean'
 scp -q build/fonts/*.otf build/fonts/LICENSE rmpp:/home/root/.local/share/fonts/rmpp-korean/
 ssh rmpp 'set -e
 mount -o remount,rw /
-mkdir -p /usr/lib/hangul
-for f in libhangul.so ko_KR.rcc; do cp /home/root/$f /usr/lib/hangul/$f.new; mv /usr/lib/hangul/$f.new /usr/lib/hangul/$f; done
+mkdir -p /usr/lib/rmpp-korean
+for f in libhangul.so ko_KR.rcc; do cp /home/root/$f /usr/lib/rmpp-korean/$f.new; mv /usr/lib/rmpp-korean/$f.new /usr/lib/rmpp-korean/$f; done
 sync
 systemctl reset-failed xochitl || true
 systemctl restart xochitl
