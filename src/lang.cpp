@@ -670,8 +670,9 @@ protected:
 // ---- Settings > Languages ----
 
 // Can `family` show `text` as written? Every character needs a glyph in that font (no fallback), and runs of
-// conjoining Hangul jamo (old Hangul) must compose: a font without the jamo features lays each jamo out as a
-// full-width glyph, so a run is checked against one syllable's width per leading consonant.
+// conjoining Hangul jamo (old Hangul) must compose: in a font that composes them, the vowels and final consonants
+// add no width to the leading consonants (they are placed inside the syllable); a font without the jamo features
+// (the OS's Noto Sans KR) sets each jamo side by side.
 bool rendersSample(const QString &family, const QString &text) {
     static QHash<QString, bool> cache;
     const QString key = family + QChar(0) + text;
@@ -689,14 +690,18 @@ bool rendersSample(const QString &family, const QString &text) {
         if (ok && !QChar::isSpace(c) && !raw.supportsCharacter(c)) ok = false;
     if (ok) {
         const QFontMetricsF fm(f);
-        const qreal syllable = fm.horizontalAdvance(QStringLiteral("가"));
         for (qsizetype i = 0; ok && i < cps.size();) {
             if (!jamo(cps[i])) { ++i; continue; }
-            qsizetype j = i; int leads = 0;
-            while (j < cps.size() && jamo(cps[j])) leads += lead(cps[j++]) ? 1 : 0;
-            const QString run = QString::fromUcs4(reinterpret_cast<const char32_t *>(cps.constData() + i), j - i);
-            if (fm.horizontalAdvance(run) > qMax(1, leads) * syllable * 1.3) ok = false;
-            i = j;
+            QString run, leads;
+            for (; i < cps.size() && jamo(cps[i]); ++i) {
+                const QString c = QString::fromUcs4(reinterpret_cast<const char32_t *>(&cps[i]), 1);
+                run += c;
+                if (lead(cps[i])) leads += c;
+            }
+            const qreal wRun = fm.horizontalAdvance(run), wLeads = fm.horizontalAdvance(leads);
+            qWarning("[rmpp-lang] sample check %s: jamo run %.1f px, leading consonants %.1f px", qPrintable(family),
+                     wRun, wLeads);
+            if (leads.isEmpty() || wRun > wLeads * 1.15) ok = false;
         }
     }
     cache.insert(key, ok);
