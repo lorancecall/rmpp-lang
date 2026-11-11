@@ -62,6 +62,7 @@ const QString kAddonRcc = QStringLiteral("/usr/lib/rmpp-lang/languages");       
 // A language: built into the core (ko, en, latin) or an add-on described by languages/<code>/language.conf.
 struct Lang {
     QString code, name, native, input, defaultFont, dir;   // input: layout | compose:<name> | none
+    QString label, keyboardName, sample;                  // indicator text, layout name, Settings sample line
     QList<QChar::Script> scripts;
     QStringList layouts, known;                           // on-screen layout ids; device families worth offering
     bool han = false, rtl = false, builtin = false;
@@ -119,16 +120,14 @@ void loadKeymap(Lang &l) {
 
 void loadLanguages() {
     g_langs.clear();
-    Lang ko;
-    ko.code = "ko"; ko.name = "Korean"; ko.native = QString::fromUtf8("한국어"); ko.input = "compose:hangul";
-    ko.scripts = {QChar::Script_Hangul}; ko.han = true; ko.layouts = {"ko_KR"}; ko.builtin = true;
-    ko.known = {"Noto Sans CJK KR", "Noto Sans KR"};
+    // The core knows no language but English and the typed-text font; everything else is an add-on.
     Lang en;
     en.code = "en"; en.name = "English"; en.native = "English"; en.input = "layout"; en.builtin = true;
     Lang latin;
     latin.code = "latin"; latin.name = "Typed text (Latin)"; latin.native = "Latin"; latin.input = "none";
     latin.builtin = true; latin.known = {"Noto Sans", "EB Garamond", "Noto Sans Mono"};
-    g_langs << ko << en << latin;
+    latin.sample = "Hello, have a nice day · Aa Gg Rr 123";
+    g_langs << en << latin;
 
     QDir root(kAddonRoot);
     const QStringList dirs = root.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
@@ -136,7 +135,7 @@ void loadLanguages() {
         const QString dir = root.absoluteFilePath(d);
         const auto kv = readKeyValues(dir + QStringLiteral("/language.conf"));
         const QString code = kv.value("code");
-        if (code.isEmpty() || code != d || findLang(code)) {
+        if (code.isEmpty() || code != d || findLang(code)) {     // also refuses the reserved en / latin
             qWarning("[rmpp-lang] add-on %s: no or bad language.conf, skipped", qPrintable(d));
             continue;
         }
@@ -155,7 +154,12 @@ void loadLanguages() {
         l.layouts = kv.value("layouts").split(' ', Qt::SkipEmptyParts);
         for (const QString &n : kv.value("scripts").split(' ', Qt::SkipEmptyParts))
             if (QChar::Script s = scriptByName(n); s != QChar::Script_Unknown) l.scripts << s;
+        l.label = kv.value("label");
+        l.keyboardName = kv.value("keyboard_name");
+        l.sample = kv.value("sample");
         if (!l.defaultFont.isEmpty()) l.known << l.defaultFont;
+        for (const QString &f : kv.value("families").split(',', Qt::SkipEmptyParts))
+            if (!l.known.contains(f.trimmed())) l.known << f.trimmed();
         loadKeymap(l);
         g_langs << l;
         qWarning("[rmpp-lang] add-on %s (%s): input=%s layouts=%s keys=%d", qPrintable(code), qPrintable(l.name),
@@ -192,7 +196,7 @@ QString confValue(const QString &key, const QString &def = QString()) { return g
 
 QStringList enabledCodes() {
     QStringList out;
-    for (const QString &c : confValue(QStringLiteral("languages"), QStringLiteral("ko,en")).split(',')) {
+    for (const QString &c : confValue(QStringLiteral("languages"), QStringLiteral("en")).split(',')) {
         const QString t = c.trimmed();
         if (!t.isEmpty() && !out.contains(t)) out << t;
     }
@@ -449,8 +453,12 @@ QString inputForScreenLayout(const QString &layout) {
 }
 QString inputLabel() {
     const QString c = currentInput();
-    if (c == QLatin1String("ko")) return QString::fromUtf8("한");
-    return c.left(2).toUpper();
+    const Lang *l = findLang(c);
+    return l && !l->label.isEmpty() ? l->label : c.left(2).toUpper();
+}
+QString inputMethod(const QString &code) {
+    const Lang *l = findLang(code);
+    return l ? l->input : QString();
 }
 
 // Physical keys of an add-on with a keymap: the character for a key event, or "" to leave it alone.
@@ -632,6 +640,8 @@ void publish() {
             {"keyboard", keyboardEnabled(code)},
             {"input", l.input},
             {"layouts", QJsonArray::fromStringList(l.layouts)},
+            {"keyboardName", l.keyboardName},
+            {"sample", l.sample},
             {"rtl", l.rtl},
             {"font", fontOf(code)},
             {"families", QJsonArray::fromStringList(fams)},

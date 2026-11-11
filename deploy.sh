@@ -3,11 +3,12 @@
 #   sh deploy.sh [HOST]            install build/ as rmpp-lang; sets aside rmpp-korean's preload link (both would
 #                                  compose Hangul twice)
 #   sh deploy.sh [HOST] --remove   take rmpp-lang out and put rmpp-korean's link back
-#   ADDONS="ja ru" sh deploy.sh    also install these language add-ons (built with tools/build-addon.sh)
+#   ADDONS="ko ja" sh deploy.sh    language add-ons to install (default: ko; built with tools/build-addon.sh)
 # Never `systemctl stop xochitl`: stopping it powers the tablet off. reset-failed avoids the restart limit (4 / 10 min).
 set -e
 cd "$(dirname "$0")"
 HOST=${1:-rmpp}
+ADDONS=${ADDONS-ko}
 if [ "$2" = "--remove" ]; then
   ssh "$HOST" 'set -e
 mount -o remount,rw /
@@ -20,12 +21,8 @@ systemctl is-active xochitl'
   exit 0
 fi
 scp -q build/librmpp-lang.so build/rmpp-lang.rcc build/rmpp-lang "$HOST":/home/root/
-ssh "$HOST" 'mkdir -p /home/root/.local/share/fonts/rmpp-lang/ko'
-# Korean font: reuse rmpp-korean's copy if present, else upload.
-ssh "$HOST" 'ls /home/root/.local/share/fonts/rmpp-lang/ko/*.otf >/dev/null 2>&1 || ls /home/root/.local/share/fonts/rmpp-korean/*.otf >/dev/null 2>&1' \
-  || scp -q build/fonts/*.otf build/fonts/LICENSE "$HOST":/home/root/.local/share/fonts/rmpp-lang/ko/
 for code in $ADDONS; do
-  [ -f build/languages/$code/language.conf ] || sh tools/build-addon.sh "$code"
+  [ -f build/languages/$code/language.conf ] && [ build/languages/$code/language.conf -nt languages/$code/language.conf ] || sh tools/build-addon.sh "$code"
   ssh "$HOST" "rm -rf /home/root/.local/share/rmpp-lang/languages/$code; mkdir -p /home/root/.local/share/rmpp-lang/languages"
   scp -q -r build/languages/$code "$HOST":/home/root/.local/share/rmpp-lang/languages/
   [ -f build/languages/$code.rcc ] && scp -q build/languages/$code.rcc "$HOST":/home/root/$code.rcc

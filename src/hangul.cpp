@@ -1,6 +1,7 @@
 // rmpp-lang Korean keyboard: Hangul (2-beolsik) composition for the on-screen keyboard and physical keyboards.
-// Part of librmpp-lang.so (loaded into xochitl with LD_PRELOAD). The ko_KR layout comes from rmpp-lang.rcc
-// (registered by lang.cpp); this file rewrites single-jamo commits into composed syllables.
+// Part of librmpp-lang.so (loaded into xochitl with LD_PRELOAD); active while the input language's add-on says
+// input=compose:hangul (languages/ko). Its on-screen layout ko_KR comes from the add-on's ko.rcc. This file
+// rewrites single-jamo commits into composed syllables.
 #include "lang.h"
 #include <QtCore/QCoreApplication>
 #include <QtCore/QObject>
@@ -94,7 +95,8 @@ QString render(const Parsed &p) {
 }
 
 // Input language for physical keyboards, shared with the on-screen keyboard and the indicator.
-bool g_korean = false;              // == (rmpplang::currentInput() == "ko")
+bool g_korean = false;              // the input language composes Hangul
+bool composesHangul() { return rmpplang::inputMethod(rmpplang::currentInput()) == QLatin1String("compose:hangul"); }
 void applyInput(const char *why);
 
 class HangulFilter : public QObject {
@@ -448,7 +450,7 @@ QObject *findVirtualKeyboard() {
 // The input language changed (key, indicator, globe key, settings): Korean composition, indicator, on-screen keyboard.
 void applyInput(const char *why) {
     const QString cur = rmpplang::currentInput();
-    const bool on = (cur == QLatin1String("ko"));
+    const bool on = composesHangul();
     if (g_korean != on) qWarning("[hangul] Korean input: %s (%s)", on ? "on" : "off", why);
     g_korean = on;
     if (g_state) {
@@ -548,7 +550,7 @@ void init() {
     auto *timer = new QTimer(filter);
     QObject::connect(timer, &QTimer::timeout, filter, [] {
         // A language or keyboard turned off in Settings > Languages: currentInput() falls back to English.
-        if (g_korean != (rmpplang::currentInput() == QLatin1String("ko"))
+        if (g_korean != composesHangul()
             || g_state->value(QStringLiteral("label")).toString() != rmpplang::inputLabel()
             || g_state->value(QStringLiteral("enabled")).toBool() != (rmpplang::inputCycle().size() > 1))
             applyInput("settings");

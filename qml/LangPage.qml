@@ -24,15 +24,7 @@ Rectangle {
         for (let i = 0; i < entries.length; ++i) if (entries[i].code === current) return entries[i];
         return null;
     }
-    // Sample line per language. Korean: the opening of Hunminjeongeum (old Hangul jamo + Hanja; shows whether a font
-    // composes old Hangul).
-    readonly property var samples: ({
-        "ko": "나랏말ᄊᆞ미 듕귁에 달아 · 國之語音 異乎中國",
-        "ja": "こんにちは、今日もよい一日を · 日本語 123",
-        "zh": "你好，祝你今天愉快 · 中文 漢字 123",
-        "ru": "Здравствуйте, хорошего дня · 123",
-        "latin": "Hello, have a nice day · Aa Gg Rr 123"
-    })
+
 
     function send(cmd) { lang.command = cmd + "#" + Date.now(); }
     // Languages in use that have their own font can be reordered (English and typed text cannot).
@@ -150,7 +142,7 @@ Rectangle {
             ArkControls.Panel {
                 label: "Add a language or a font"
                 description: "Languages are add-ons: choose them in the rmpp installer. Fonts: rmpp-lang font add "
-                             + "MyFont.ttf --lang ko from your computer, or copy .ttf / .otf files into "
+                             + "MyFont.ttf --lang CODE from your computer, or copy .ttf / .otf files into "
                              + "/home/root/.local/share/fonts/rmpp-lang/ followed by the language code (ko, ja, zh, latin, ...)."
                 Layout.fillWidth: true
                 Layout.topMargin: ArkControls.Values.spacing.large
@@ -204,12 +196,10 @@ Rectangle {
                 visible: !!detail.e.enabled && detail.e.code !== "latin"
                 label: "Keyboard"
                 description: detail.e.hasKeyboard
-                    ? (detail.e.code === "ko"
-                       ? "2-beolsik on the on-screen keyboard (turn on Korean in Language & keyboard). "
-                         + "Ctrl+Space or right Alt on Type Folio, Bluetooth and USB keyboards."
-                       : "On-screen layout " + detail.e.layouts.join(", ") + " (turn it on in Language & keyboard). "
-                         + "Ctrl+Space or right Alt on physical keyboards."
-                         + (detail.e.rtl ? " Right-to-left editing is not checked yet." : ""))
+                    ? (detail.e.keyboardName ? detail.e.keyboardName + " on the on-screen keyboard"
+                                             : "On-screen layout " + detail.e.layouts.join(", "))
+                      + " (turn it on in Language & keyboard). Ctrl+Space or right Alt on Type Folio, Bluetooth "
+                      + "and USB keyboards." + (detail.e.rtl ? " Right-to-left editing is not checked yet." : "")
                     : "Not yet: typing this language needs a conversion input method."
                 Layout.fillWidth: true
                 action: ArkControls.Toggle {
@@ -239,7 +229,7 @@ Rectangle {
             }
             Text {
                 visible: !!detail.e.enabled
-                text: page.samples[detail.e.code] || ""
+                text: detail.e.sample || ""
                 font.family: page.sampleFont(detail.e, detail.e.font)
                 font.pixelSize: 40
                 elide: Text.ElideRight
@@ -314,7 +304,7 @@ Rectangle {
                             }
                             Text {
                                 width: parent.width
-                                text: page.samples[page.entry ? page.entry.code : ""] || "Aa"
+                                text: (page.entry && page.entry.sample) || "Aa"
                                 color: chosen ? "white" : "black"
                                 font.family: page.sampleFont(page.entry || {}, modelData)
                                 font.pixelSize: 34

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Cross-build librmpp-lang.so and rmpp-lang.rcc, and fetch the default Korean font.
+# Cross-build librmpp-lang.so and rmpp-lang.rcc (the core). Language add-ons: tools/build-addon.sh CODE.
 # SDK defaults to ../sdk (Arm GNU aarch64-none-linux-gnu + Qt 6.10 headers + device Qt libs in sdk/devlibs).
 set -e
 cd "$(dirname "$0")"
@@ -12,6 +12,5 @@ mkdir -p build
   -L"$SDK/devlibs" -l:libQt6Core.so.6 -l:libQt6Gui.so.6 -l:libQt6Qml.so.6 -l:libQt6Quick.so.6 -ldl \
   -Wl,--allow-shlib-undefined -Wl,-soname,librmpp-lang.so
 ${RCC:-uvx --from pyside6-essentials==6.10.1 pyside6-rcc} --binary --no-compress rmpp-lang.qrc -o build/rmpp-lang.rcc
-sh fonts/fetch.sh build/fonts
 cp tools/rmpp-lang build/rmpp-lang
-ls -la build build/fonts
+ls -la build

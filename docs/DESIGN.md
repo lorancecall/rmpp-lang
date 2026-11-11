@@ -1,8 +1,10 @@
 # rmpp-lang design
 
 rmpp-lang is one add-on for the languages used on the reMarkable Paper Pro (OS 3.29, Qt 6.10.3). It grows out of
-rmpp-korean: the Korean keyboard moves in unchanged, and fonts per language are added. Japanese and Chinese get
-fonts first; their keyboards need conversion input methods and come later.
+rmpp-korean. The core is language-neutral (English and the typed-text font only); every language, Korean
+included, is an add-on in `languages/<code>/` that the user picks when installing. The Korean keyboard moves in
+unchanged (its composition engine lives in the core, the add-on turns it on). Japanese and Chinese get fonts first;
+their keyboards need conversion input methods and come later.
 
 Status: prototype on branch `feature/rmpp-lang` (this document, `src/lang.cpp`, `qml/`, `tools/`).
 
@@ -11,18 +13,19 @@ Status: prototype on branch `feature/rmpp-lang` (this document, `src/lang.cpp`, 
 1. **Settings > Languages**: turn languages on and off; per language a keyboard (where one exists) and a font.
 2. **Fonts per language**, including the font of typed text, installable from outside with a language tag
    (`rmpp-lang font add X.ttf --lang ko`, or `font get "Family" --lang ko` for Google Fonts OFL families).
-3. **Keyboards**: Korean 2-beolsik now (on-screen, Type Folio, Bluetooth, USB; Ctrl+Space / right Alt; 한/EN
-   indicator). More keyboards later (see "Next keyboards").
+3. **Keyboards**: Korean 2-beolsik (on-screen, Type Folio, Bluetooth, USB; Ctrl+Space / right Alt; 한/EN
+   indicator) and Russian ЙЦУКЕН as add-ons; more later (see "Next keyboards").
 4. **A contract for other add-ons**: rmpp-hwr (v0.3) reads the language list and fonts from rmpp-lang.
 
-Language codes: `ko`, `en`, `ja`, `zh`, `latin` (`latin` = the font of typed Latin text, not a language one turns on).
+Language codes: `en` and `latin` in the core (`latin` = the font of typed Latin text, not a language one turns
+on); add-ons `ko`, `ja`, `zh`, `ru`, ... (rmpp-hwr uses the same codes).
 
 ## Pieces
 
 | Piece | Where | What |
 |---|---|---|
-| `librmpp-lang.so` | `/usr/lib/rmpp-lang/`, linked as `/usr/lib/rmpp-preload.d/50-rmpp-lang.so` | Loaded into xochitl by rmpp-preload. `lang.cpp`: settings, fonts, Settings page; `hangul.cpp`: Korean keyboard. |
-| `rmpp-lang.rcc` | `/usr/lib/rmpp-lang/` | QML of the Settings page, icon, and the `ko_KR` on-screen layout (`:/misc/keyboards/ko_KR/keyboard_layout.json`). |
+| `librmpp-lang.so` | `/usr/lib/rmpp-lang/`, linked as `/usr/lib/rmpp-preload.d/50-rmpp-lang.so` | Loaded into xochitl by rmpp-preload. `lang.cpp`: settings, fonts, add-ons, Settings page; `hangul.cpp`: Hangul composition (used by the ko add-on). |
+| `rmpp-lang.rcc` | `/usr/lib/rmpp-lang/` | QML of the Settings page and its icon. (On-screen layouts come with the add-ons.) |
 | `rmpp-lang` | `/usr/bin/rmpp-lang` | Tablet command (POSIX sh): languages, keyboards, fonts, probe. |
 | `tools/rmpp-lang.py` | computer | Same commands over ssh; uploads font files; fetches OFL families from google/fonts. |
 | `lang.conf` | `/home/root/.config/rmpp-lang/lang.conf` | Settings, `key=value`. Written by the Settings page and the command. |
@@ -36,8 +39,9 @@ changes lives in `/home` and survives OS updates. The add-on polls the settings 
 ### lang.conf
 
 ```ini
-languages=ko,en          # on, in priority order (decides Han characters, see below); en is always on
-keyboard.ko=1            # rmpp-lang's Korean keyboard (composition, physical-keyboard switching, indicator)
+languages=ko,en          # on, in order (keyboard switching order; also decides Han characters); en is always on;
+                         # default "en", each add-on's postinstall adds itself (rmpp-lang lang on <code>)
+keyboard.ko=1            # the language's keyboard (0 = fonts only; physical switching and indicator skip it)
 font.ko=NanumMyeongjo    # family for Korean; empty or missing = the device default
 font.ja=
 font.zh=
@@ -71,7 +75,7 @@ before the platform (fontconfig) fallbacks whenever the requested font lacks a g
 ("reMarkable Sans", "reMarkable Serif Small") have no Hangul, kana or Han, so for those scripts the fallback
 decides what the user sees, everywhere: UI, file names, keyboard, typed text.
 
-| Language | Scripts set (from the manifest; Korean built in) |
+| Language | Scripts set (from the add-on's manifest) |
 |---|---|
 | ko | Hangul, + Han |
 | ja (add-on) | Hiragana, Katakana, + Han |
@@ -123,17 +127,18 @@ A per-script fallback cannot change Latin (the family has those glyphs), so rmpp
 
 ## Keyboards
 
-The Korean keyboard is rmpp-korean's code (`src/hangul.cpp`) with three changes: it starts from rmpp-lang, its
-layout comes from `rmpp-lang.rcc`, and `keyboard.ko=0` turns off physical-keyboard switching and the 한/EN
-indicator. Which on-screen languages the globe key cycles through stays xochitl's own setting (Settings >
-Language & keyboard), where Korean appears because the layout is registered.
+The Korean keyboard is rmpp-korean's code: the Hangul composition engine (`src/hangul.cpp`) stays in the core
+and is active while the input language's manifest says `input=compose:hangul` (`languages/ko`); the `ko_KR`
+on-screen layout comes with the add-on (`ko.rcc`), the 한 label from its `label=`. `keyboard.ko=0` turns off
+physical-keyboard switching and the indicator for it. Which on-screen languages the globe key cycles through
+stays xochitl's own setting (Settings > Language & keyboard), where Korean appears because the layout is registered.
 
 Adding a keyboard:
 
-- **Alphabet layouts** (one key = one character, e.g. Greek, Cyrillic): a `keyboard_layout.json` under
-  `layout/misc/keyboards/<locale>/` in the qrc, an entry with `vkLayout` in `kLanguages`, and a key map for
-  physical keyboards. No composition code.
-- **Composition** (Korean): an input-method event filter like `hangul.cpp`.
+- **Alphabet layouts** (one key = one character, e.g. Greek, Cyrillic): an add-on with
+  `keyboards/<locale>/keyboard_layout.json` and `keymap.conf` (see `languages/ru`). No code.
+- **Composition** (Korean, later Vietnamese Telex): an engine in the core (`hangul.cpp`), chosen by the add-on's
+  `input=compose:<name>`.
 - **Conversion IMEs** (Japanese kana-kanji, Chinese pinyin): need a candidate bar and a dictionary
   (e.g. libkkc/mozc-style data, libpinyin/rime). Out of scope for now; fonts come first.
 - **Right-to-left** (Hebrew, Arabic): layout is easy, but xochitl's text editing and cursor movement must be
@@ -163,10 +168,10 @@ Vietnamese (composition), then Japanese/Chinese IMEs.
 
 ## Language add-ons
 
-The core package `rmpp-lang` contains the add-on library, the Settings page, the command, **Korean** (keyboard and
-font) and the two entries every tablet has: `en` and `latin` (the typed-text font). Every other language is an
-add-on: a folder in this repository, packaged as `rmpp-lang-<code>` (depends on `rmpp-lang`), chosen at install
-time. Adding a language = adding a folder; the core is not rebuilt.
+The core package `rmpp-lang` contains the library (with the composition engines), the Settings page, the command
+and the two entries every tablet has: `en` and `latin` (the typed-text font). Every language, Korean included, is
+an add-on: a folder in this repository, packaged as `rmpp-lang-<code>` (depends on `rmpp-lang`), chosen at install
+time (`default=1` preselects it; Korean has it). Adding a language = adding a folder; the core is not rebuilt.
 
 ### In the repository
 
@@ -181,7 +186,7 @@ languages/<code>/
 ```
 
 `<code>`: lowercase ISO 639-1 (`ja`, `zh`, `ru`, `uk`, `tr`, `vi`, `he`, ...), a region suffix only when needed
-(`zh-hant`). Reserved for the core: `ko`, `en`, `latin`.
+(`zh-hant`). Reserved for the core: `en`, `latin`.
 
 `language.conf` (key=value, `#` comments, UTF-8; read by the core, the package build and the installer):
 
@@ -200,6 +205,11 @@ input=layout               # layout | compose:<name> (built into the core: hangu
 layouts=ru_RU              # on-screen layout ids = folder names under keyboards/ ("" = none)
 rtl=0                      # 1 = right-to-left (the Settings page warns that editing is not checked yet)
 font=                      # default family ("" = device default); the user can pick another
+families=Noto Sans         # device families worth offering besides the add-on's fonts (comma-separated)
+default=0                  # 1 = preselected in the installer menu
+label=                     # indicator text on the format bar ("" = the code in capitals; ko: 한)
+keyboard_name=ЙЦУКЕН       # how Settings names the layout ("" = the layout ids)
+sample=Здравствуйте, хорошего дня · 123   # Settings sample line in the chosen font
 ```
 
 Script names: `Latin Greek Cyrillic Armenian Hebrew Arabic Devanagari Bengali Thai Lao Georgian Hangul Hiragana
@@ -238,7 +248,7 @@ their own folder (`/home/root/.local/share/fonts/rmpp-lang/<code>/`). A newly in
 (the core ignores codes without a manifest).
 
 Physical keyboards: Ctrl+Space / right Alt cycle through the enabled languages that have `input` other than
-`none` (with only Korean on, this is today's Korean/English toggle); the indicator shows the language's code.
+`none` (with only Korean on, this is today's Korean/English toggle); the indicator shows the language's label.
 
 ### Packaging (rmpp-packages CI, proposal)
 
@@ -253,7 +263,7 @@ license. Files: the folder minus `keyboards/` and `fonts.conf`, plus downloaded 
 A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tailscale 1002).
 
 - **List**: the languages in use in their order (▲ ▼: the order keyboards switch in; the same order decides
-  which font draws Han characters shared by ko/ja/zh), then the others; one row per installed language (Korean, English, typed text, then the add-ons) with a one-line
+  which font draws Han characters shared by ko/ja/zh), then the others; one row per installed language (the add-ons, English, typed text) with a one-line
   summary ("Keyboard on · Font: NanumMyeongjo"). Tapping a row opens its page.
 - **Language page**: on/off, keyboard (with where to turn on the on-screen layout), font, a sample line in that
   font, priority ("Move up": shared Han characters use the first language's font), the folder for the user's fonts.

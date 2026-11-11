@@ -4,7 +4,4 @@
     <file>qml/LangPage.qml</file>
     <file>icons/language.svg</file>
   </qresource>
-  <qresource prefix="/">
-    <file alias="misc/keyboards/ko_KR/keyboard_layout.json">layout/misc/keyboards/ko_KR/keyboard_layout.json</file>
-  </qresource>
 </RCC>

@@ -7,7 +7,7 @@ STATE=$CONF_DIR/state.json
 FONTS=/home/root/.local/share/fonts/rmpp-lang
 ADDONS=/home/root/.local/share/rmpp-lang/languages
 # Built-in languages, then the installed add-ons (one folder with a language.conf each).
-CODES="ko en latin$(for d in "$ADDONS"/*/language.conf; do [ -f "$d" ] && printf ' %s' "$(basename "$(dirname "$d")")"; done)"
+CODES="en latin$(for d in "$ADDONS"/*/language.conf; do [ -f "$d" ] && printf ' %s' "$(basename "$(dirname "$d")")"; done)"
 
 usage() {
   cat <<'USAGE'
@@ -20,7 +20,7 @@ Usage: rmpp-lang COMMAND
   font use FAMILY --lang CODE         "" = back to the default
   font rm FILE_NAME --lang CODE
   probe [trace on|off]                write the fonts in use to /tmp/rmpp-lang-probe.txt
-Codes: ko en latin + installed add-ons (latin = typed Latin text, experimental)
+Codes: en latin + installed add-ons (latin = typed Latin text, experimental)
 USAGE
   exit "${1:-0}"
 }
@@ -36,7 +36,7 @@ set_key() {
   printf '%s=%s\n' "$1" "$2" >> "$CONF.new"
   mv "$CONF.new" "$CONF"
 }
-languages() { l=$(get_key languages); echo "${l:-ko,en}"; }
+languages() { l=$(get_key languages); echo "${l:-en}"; }
 
 family_of() { fc-scan --format '%{family[0]}\n' "$1" 2>/dev/null | head -n 1; }
 

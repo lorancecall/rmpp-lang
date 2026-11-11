@@ -5,7 +5,7 @@
 
 namespace rmpplang {
 
-// Languages: ko, en, latin are built in; others are add-ons (/home/root/.local/share/rmpp-lang/languages/<code>/).
+// Languages: en and latin are built in; all others are add-ons (/home/root/.local/share/rmpp-lang/languages/<code>/).
 bool languageEnabled(const QString &code);
 bool keyboardEnabled(const QString &code);     // enabled, has an input method, keyboard.<code> not 0
 
@@ -15,11 +15,12 @@ QStringList inputCycle();
 QString currentInput();
 void setInput(const QString &code);
 void cycleInput();
-QString inputLabel();                            // "한", "EN", "RU", ...
+QString inputLabel();                            // the add-on's label ("한") or the code ("EN", "RU")
+QString inputMethod(const QString &code);        // layout | compose:<name> | none
 QString screenLayoutFor(const QString &code);    // on-screen layout id of a language ("" = none)
 QString inputForScreenLayout(const QString &layout);
 
-// Korean keyboard (hangul.cpp): started once at startup.
+// Hangul composition (hangul.cpp), used by add-ons with input=compose:hangul: started once at startup.
 void hangulInit();
 
 } // namespace rmpplang
