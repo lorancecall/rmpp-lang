@@ -700,6 +700,56 @@ void syncIndicator() {
     }
 }
 
+// Research probe (off unless /tmp/rmpp-lang-touch exists): logs touch / mouse events on windows with the
+// deepest item under the point, and input-method commits, to learn when on-screen keys commit (press or release)
+// and whether swipes or long presses on keys can be seen (old Hangul by sliding a key).
+class TouchProbe : public QObject {
+public:
+    using QObject::QObject;
+    bool on = false;
+protected:
+    static QString itemAt(QQuickWindow *w, QPointF p) {
+        QQuickItem *it = w->contentItem(), *found = nullptr;
+        for (int depth = 0; it && depth < 80; ++depth) {
+            QQuickItem *next = nullptr;
+            const auto kids = it->childItems();
+            for (auto k = kids.rbegin(); k != kids.rend(); ++k) {
+                QQuickItem *c = *k;
+                if (c->isVisible() && c->contains(c->mapFromScene(p))) { next = c; break; }
+            }
+            if (!next) break;
+            found = it = next;
+        }
+        if (!found) return QStringLiteral("-");
+        QString t = found->property("text").toString();
+        for (QQuickItem *u = found; t.isEmpty() && u; u = u->parentItem()) t = u->property("text").toString();
+        return QStringLiteral("%1 \"%2\"").arg(QLatin1String(found->metaObject()->className()), t.left(12));
+    }
+    bool eventFilter(QObject *obj, QEvent *ev) override {
+        if (!on) return false;
+        const auto t = ev->type();
+        if (t == QEvent::InputMethod) {
+            auto *e = static_cast<QInputMethodEvent *>(ev);
+            qWarning("[touch] commit \"%s\" repl %d,%d to %s", qPrintable(e->commitString()), e->replacementStart(),
+                     e->replacementLength(), obj->metaObject()->className());
+            return false;
+        }
+        auto *w = qobject_cast<QQuickWindow *>(obj);
+        if (!w) return false;
+        if (t == QEvent::TouchBegin || t == QEvent::TouchUpdate || t == QEvent::TouchEnd
+            || t == QEvent::MouseButtonPress || t == QEvent::MouseButtonRelease) {
+            auto *pe = static_cast<QPointerEvent *>(ev);
+            if (pe->points().isEmpty()) return false;
+            const QPointF p = pe->points().first().scenePosition();
+            if (t == QEvent::TouchUpdate && pe->points().first().state() == QEventPoint::Stationary) return false;
+            qWarning("[touch] %s %.0f,%.0f %s", t == QEvent::TouchBegin ? "begin" : t == QEvent::TouchUpdate ? "move"
+                     : t == QEvent::TouchEnd ? "end" : t == QEvent::MouseButtonPress ? "mpress" : "mrelease",
+                     p.x(), p.y(), qPrintable(itemAt(w, p)));
+        }
+        return false;
+    }
+};
+
 void init() {
     auto *app = QCoreApplication::instance();
     auto *filter = new HangulFilter(app);
@@ -716,6 +766,13 @@ void init() {
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("insert:")))
             insertOld(v.toString().mid(7).section(QLatin1Char('#'), 0, 0));
     });
+    auto *touch = new TouchProbe(app);
+    app->installEventFilter(touch);
+    auto *touchTimer = new QTimer(touch);
+    QObject::connect(touchTimer, &QTimer::timeout, touch, [touch] {
+        touch->on = QFile::exists(QStringLiteral("/tmp/rmpp-lang-touch"));
+    });
+    touchTimer->start(1000);
     auto *timer = new QTimer(filter);
     QObject::connect(timer, &QTimer::timeout, filter, [] {
         // A language or keyboard turned off in Settings > Languages: currentInput() falls back to English.
