@@ -162,6 +162,14 @@ void applyInput(const char *why);
 void noteJamo(char16_t j);          // a jamo was typed (swipe.cpp part below)
 bool oldLettersOn();                // the input language types old letters (old_letters=1)
 
+// Input languages without letter case (Hangul composition, kana, pinyin, Hanja): no automatic Shift.
+bool caselessInput() {
+    const QString code = rmpplang::currentInput();
+    const QString kind = rmpplang::convertKind(code);
+    return rmpplang::inputMethod(code) == QLatin1String("compose:hangul") || kind == QLatin1String("kana")
+        || kind == QLatin1String("pinyin") || kind == QLatin1String("hanja");
+}
+
 // Hardware keyboards: a tap of left Alt alone turns the jamo just typed into the next letter of its row (the same
 // order as the on-screen swipes: left, right, up), and back to the plain letter.
 const char16_t *altCycle(char16_t base) {
@@ -171,9 +179,9 @@ const char16_t *altCycle(char16_t base) {
     return nullptr;
 }
 
-// Old syllables are conjoining jamo (2-3 characters drawn as one). When the engine replaces them while typing,
-// xochitl redraws only the region it computes for the changed characters, and parts of the stacked syllable stay
-// blank (a reopened notebook draws them right). Ask the text item for a full redraw shortly after such a commit.
+// Old syllables are conjoining jamo (2-3 characters drawn as one). xochitl draws them right when they are inserted,
+// but not when they replace text in place (parts stay blank until the line is laid out again, tested on 3.29):
+// the composer then deletes the old syllable and inserts the new one as two edits.
 bool hasConjoining(const QString &s) {
     for (QChar c : s) {
         const char16_t u = c.unicode();
@@ -182,58 +190,44 @@ bool hasConjoining(const QString &s) {
     }
     return false;
 }
-bool g_selfSend = false;            // our own re-commit (redraw): the composer ignores it
-
-// Strategy (research; /tmp/rmpp-lang-redraw holds 1, 2 or 3, default 2):
-//   1 = update() on the item and window; 2 = commit the word before the cursor again, unchanged;
-//   3 = commit the paragraph up to the cursor again, unchanged.
-int redrawStrategy() {
-    QFile f(QStringLiteral("/tmp/rmpp-lang-redraw"));
-    if (!f.open(QIODevice::ReadOnly)) return 2;
-    const int v = f.readAll().trimmed().toInt();
-    return v >= 1 && v <= 3 ? v : 2;
-}
-
-void redrawLater(QObject *obj, const QString &before, const QString &after) {
-    if (!hasConjoining(before) && !hasConjoining(after)) return;
-    QPointer<QObject> o(obj);
-    QTimer::singleShot(0, [o] {
-        QObject *t = o.data();
-        auto *item = qobject_cast<QQuickItem *>(t);
-        if (!item) return;
-        const int how = redrawStrategy();
-        if (how == 1) {
-            item->update();
-            if (item->window()) item->window()->update();
-            return;
-        }
-        QInputMethodQueryEvent q(Qt::ImSurroundingText | Qt::ImCursorPosition);
-        QCoreApplication::sendEvent(t, &q);
-        const QString text = q.value(Qt::ImSurroundingText).toString();
-        const int cur = q.value(Qt::ImCursorPosition).toInt();
-        if (cur <= 0 || cur > text.size()) return;
-        int from = cur;
-        if (how == 2) while (from > 0 && !text.at(from - 1).isSpace()) --from;
-        else from = 0;
-        const QString span = text.mid(from, cur - from);
-        if (span.isEmpty()) return;
-        QInputMethodEvent im;
-        im.setCommitString(span, -span.size(), span.size());
-        g_selfSend = true;
-        QCoreApplication::sendEvent(t, &im);
-        g_selfSend = false;
-    });
-}
-
 class HangulFilter : public QObject {
 public:
     using QObject::QObject;
+
+    void sendOwn(QObject *obj, const QString &text, int replace) {
+        QInputMethodEvent im;
+        if (replace > 0) im.setCommitString(text, -replace, replace);
+        else im.setCommitString(text);
+        ownSend = true;
+        QCoreApplication::sendEvent(obj, &im);
+        ownSend = false;
+    }
+    // Replace the prevLen characters before the cursor with out, in an event we write ourselves.
+    void replaceBefore(QObject *obj, const QString &before, const QString &out, int prevLen) {
+        if (prevLen > 0 && (hasConjoining(before) || hasConjoining(out))) {
+            sendOwn(obj, QString(), prevLen);
+            sendOwn(obj, out, 0);
+        } else {
+            sendOwn(obj, out, prevLen);
+        }
+    }
+    // The same, rewriting an incoming event; returns how far the cursor moves from where it is now.
+    int rewrite(QObject *obj, QInputMethodEvent *e, const QString &before, const QString &out, int prevLen) {
+        if (prevLen > 0 && (hasConjoining(before) || hasConjoining(out))) {
+            sendOwn(obj, QString(), prevLen);
+            e->setCommitString(out);
+            return int(out.size());
+        }
+        e->setCommitString(out, -prevLen, prevLen);
+        return int(out.size()) - prevLen;
+    }
 
     // A swipe on a key: the jamo it just typed becomes an old letter (ㅈ -> ᅎ). Called after the commit was applied.
     void replaceLast(char16_t from, char16_t to) {
         QObject *obj = QGuiApplication::focusObject();
         if (!obj || block.empty() || block.back() != from || !stillComposing(obj)) return;
         const int prevLen = int(lastOut.size());
+        const QString before = lastOut;
         std::vector<char16_t> grown = block;
         grown.back() = to;
         const Parsed p = parse(grown);
@@ -250,12 +244,7 @@ public:
             lastOut = render(parse(block));
             out = render(pp) + lastOut;
         }
-        QInputMethodEvent im;
-        im.setCommitString(out, -prevLen, prevLen);
-        ownSend = true;
-        QCoreApplication::sendEvent(obj, &im);
-        ownSend = false;
-        redrawLater(obj, QString(), out);
+        replaceBefore(obj, before, out, prevLen);
         owner = obj;
         lastCursor = cursorOf(obj);
     }
@@ -318,7 +307,7 @@ private:
     }
 
     bool onInputMethod(QObject *obj, QInputMethodEvent *e) {
-        if (ownSend || g_selfSend) return false;
+        if (ownSend) return false;
         if (e == lastEvent && e->commitString() == lastSet) return false;  // re-delivered
         if (obj != QGuiApplication::focusObject()) return false;
         QString commit = e->commitString();
@@ -345,8 +334,7 @@ private:
                 const QString before = lastOut;
                 block.pop_back();
                 lastOut = render(parse(block));
-                e->setCommitString(lastOut, -prev, prev);
-                redrawLater(obj, before, lastOut);
+                rewrite(obj, e, before, lastOut, prev);
                 lastEvent = e; lastSet = lastOut;
                 return false;
             }
@@ -367,9 +355,7 @@ private:
                 block = grown;
                 const QString before = lastOut;
                 lastOut = render(p);
-                e->setCommitString(lastOut, -prevLen, prevLen);
-                redrawLater(obj, before, lastOut);
-                finish(obj, int(lastOut.size()) - prevLen);
+                finish(obj, rewrite(obj, e, before, lastOut, prevLen));
                 lastEvent = e; lastSet = lastOut;
                 return false;
             }
@@ -384,9 +370,7 @@ private:
                     const QString before = lastOut;
                     block = next;
                     lastOut = render(pn);
-                    e->setCommitString(out, -prevLen, prevLen);
-                    redrawLater(obj, before, out);
-                    finish(obj, int(out.size()) - prevLen);
+                    finish(obj, rewrite(obj, e, before, out, prevLen));
                     lastEvent = e; lastSet = out;
                     return false;
                 }
@@ -394,7 +378,6 @@ private:
         }
         block.assign(1, j);
         lastOut = QString(QChar(j));
-        redrawLater(obj, QString(), lastOut);
         finish(obj, 1);
         return false;
     }
@@ -438,14 +421,8 @@ private:
     // The on-screen keyboard turns Shift on at the start of text (ㄱ -> ㄲ in Hangul). The field answers the
     // keyboard's hints query; add Qt::ImhNoAutoUppercase while the input language has no letter case.
     bool inQuery = false;
-    static bool caseless() {
-        const QString code = rmpplang::currentInput();
-        const QString kind = rmpplang::convertKind(code);
-        return rmpplang::inputMethod(code) == QLatin1String("compose:hangul") || kind == QLatin1String("kana")
-            || kind == QLatin1String("pinyin") || kind == QLatin1String("hanja");
-    }
     bool onQuery(QObject *obj, QInputMethodQueryEvent *q) {
-        if (inQuery || !(q->queries() & Qt::ImHints) || !caseless()) return false;
+        if (inQuery || !(q->queries() & Qt::ImHints) || !caselessInput()) return false;
         inQuery = true;
         obj->event(q);                          // let the field answer first
         inQuery = false;
@@ -537,12 +514,7 @@ private:
         const QString before = lastOut;
         block.pop_back();
         lastOut = render(parse(block));
-        QInputMethodEvent im;
-        im.setCommitString(lastOut, -prev, prev);
-        redrawLater(obj, before, lastOut);
-        ownSend = true;
-        QCoreApplication::sendEvent(obj, &im);
-        ownSend = false;
+        replaceBefore(obj, before, lastOut, prev);
         owner = obj;
         lastCursor = cursorOf(obj);
         return true;   // swallow the real backspace
@@ -683,6 +655,7 @@ void applyInput(const char *why) {
         g_state->insert(QStringLiteral("label"), rmpplang::inputLabel());
         g_state->insert(QStringLiteral("enabled"), rmpplang::inputCycle().size() > 1);
         g_state->insert(QStringLiteral("old"), on && rmpplang::oldLetters(cur));
+        g_state->insert(QStringLiteral("caseless"), caselessInput());
     }
     // Keep the on-screen keyboard on the same language (only if that layout is one of its enabled languages).
     if (qstrcmp(why, "screen") == 0) return;
@@ -836,7 +809,6 @@ void insertOld(const QString &s) {
     QInputMethodEvent im;
     im.setCommitString(s);
     QCoreApplication::sendEvent(obj, &im);
-    redrawLater(obj, QString(), s);      // 방점 change how the syllable before them is drawn
 }
 
 void syncIndicator() {
@@ -914,7 +886,7 @@ protected:
         const auto t = ev->type();
         if (t != QEvent::TouchBegin && t != QEvent::TouchEnd) return false;
         auto *w = qobject_cast<QQuickWindow *>(obj);
-        if (!w || !oldLettersOn()) return false;
+        if (!w) return false;
         auto *pe = static_cast<QPointerEvent *>(ev);
         if (pe->points().isEmpty()) return false;
         const QPointF p = pe->points().first().scenePosition();
@@ -924,9 +896,15 @@ protected:
                 && panel->mapRectToScene(QRectF(0, 0, panel->width(), panel->height())).contains(p);
             g_touchBeginMs = onKeys ? QDateTime::currentMSecsSinceEpoch() : -1;
             start = p;
+            if (onKeys) {   // the Shift key (bottom-left key) touched: Shift is the user's own
+                const QPointF k = panel->mapFromScene(p);
+                const qreal sc = panel->width() / 1620.0;
+                if (k.x() < 215 * sc && k.y() > panel->height() - 300 * sc && k.y() < panel->height() - 120 * sc)
+                    g_state->insert(QStringLiteral("userShift"), double(QDateTime::currentMSecsSinceEpoch()));
+            }
             return false;
         }
-        if (g_touchBeginMs < 0) return false;
+        if (g_touchBeginMs < 0 || !oldLettersOn()) return false;
         const qreal dx = p.x() - start.x(), dy = p.y() - start.y();
         char dir = 0;
         if (qAbs(dx) >= kSwipe && qAbs(dx) > qAbs(dy)) dir = dx < 0 ? 'L' : 'R';
@@ -954,6 +932,22 @@ Item {
     z: 50
     visible: !!hangul.old && !!vk && vk.visible && vk.language === "ko_KR" && !vk.symbolsSelected && !vk.shiftSelected
     readonly property real s: width / 1620
+    // No automatic Shift for Korean, Japanese, Chinese (developer's request; the keyboard ignores
+    // Qt::ImhNoAutoUppercase): Shift turned on without a touch on the Shift key goes off again.
+    function noAutoShift() {
+        if (vk && vk.shiftSelected && hangul.caseless && Date.now() - (hangul.userShift || 0) > 1500)
+            vk.shiftSelected = false;
+    }
+    Connections {
+        target: m.vk
+        function onShiftSelectedChanged() { m.noAutoShift(); }
+        function onVisibleChanged() { m.noAutoShift(); }
+        function onLanguageChanged() { m.noAutoShift(); }
+    }
+    Connections {
+        target: hangul
+        function onValueChanged(key, value) { if (key === "caseless") m.noAutoShift(); }
+    }
     // [row, index in row, left, right, up]
     readonly property var keys: [
         [0, 1, 1, 1, 0], [0, 4, 1, 1, 1], [1, 2, 0, 0, 1], [1, 3, 0, 0, 1], [1, 4, 0, 0, 1],
@@ -1075,6 +1069,8 @@ void init() {
     g_state->insert(QStringLiteral("enabled"), false);
     g_state->insert(QStringLiteral("label"), QStringLiteral("EN"));
     g_state->insert(QStringLiteral("old"), false);
+    g_state->insert(QStringLiteral("caseless"), false);
+    g_state->insert(QStringLiteral("userShift"), 0.0);
     QObject::connect(g_state, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) { rmpplang::cycleInput(); applyInput("indicator"); }
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("insert:")))
@@ -1094,6 +1090,7 @@ void init() {
         if (g_korean != composesHangul()
             || g_state->value(QStringLiteral("label")).toString() != rmpplang::inputLabel()
             || g_state->value(QStringLiteral("enabled")).toBool() != (rmpplang::inputCycle().size() > 1)
+            || g_state->value(QStringLiteral("caseless")).toBool() != caselessInput()
             || g_state->value(QStringLiteral("old")).toBool()
                    != (composesHangul() && rmpplang::oldLetters(rmpplang::currentInput())))
             applyInput("settings");
