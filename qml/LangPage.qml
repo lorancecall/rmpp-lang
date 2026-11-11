@@ -34,16 +34,18 @@ Rectangle {
         return ordered.some(o => movable(o) && (dir < 0 ? o.priority < e.priority : o.priority > e.priority));
     }
     function summary(e) {
-        if (e.code === "latin") return "Font: " + (e.font || "Default (reMarkable Sans)");
+        if (e.code === "latin") return "Font: " + fontLabel(e);
         if (e.code === "en") return "Always on";
         if (!e.enabled) return "Off";
         const parts = [];
         if (e.hasKeyboard) parts.push("Keyboard " + (e.keyboard ? "on" : "off"));
-        parts.push("Font: " + (e.font || "Default"));
+        parts.push("Font: " + fontLabel(e));
         return parts.join(" · ");
     }
-    // "" = Default: show the device's own choice, not the current fallback.
-    function sampleFont(e, fam) { return fam || e.deviceDefault || "reMarkable Sans"; }
+    // The font in use: the user's choice, else the language's default family (marked "· default").
+    function usedFamily(e) { return e.font || e.defaultFamily || "reMarkable Sans"; }
+    function fontLabel(e) { return e.font && e.font !== e.defaultFamily ? e.font : usedFamily(e) + " · default"; }
+    function sampleFont(e, fam) { return fam || usedFamily(e); }
 
     x: payloadLoaderRef.x
     y: payloadLoaderRef.y
@@ -214,7 +216,7 @@ Rectangle {
             }
             ArkControls.Panel {
                 visible: !!detail.e.enabled
-                label: "Font: " + (detail.e.font || "Default")
+                label: "Font: " + page.fontLabel(detail.e)
                 description: detail.e.code === "latin"
                     ? "Experimental: the font of typed text in notebooks. Other devices and the reMarkable apps keep "
                       + "their own font."
@@ -281,10 +283,11 @@ Rectangle {
                     Layout.fillWidth: true
                 }
                 Repeater {
-                    model: page.entry ? [""].concat(page.entry.families) : []
+                    model: page.entry ? page.entry.families : []
                     delegate: Rectangle {
                         required property var modelData
-                        readonly property bool chosen: page.entry && page.entry.font === modelData
+                        readonly property bool isDefault: page.entry && modelData === page.entry.defaultFamily
+                        readonly property bool chosen: page.entry && page.usedFamily(page.entry) === modelData
                         Layout.fillWidth: true
                         implicitHeight: 128
                         color: chosen ? "black" : "white"
@@ -297,7 +300,7 @@ Rectangle {
                             width: parent.width - 48
                             spacing: 6
                             Text {
-                                text: modelData || "Default"
+                                text: modelData + (isDefault ? "  · default" : "")
                                 color: chosen ? "white" : "black"
                                 font.pixelSize: 28
                                 font.bold: true
@@ -313,7 +316,11 @@ Rectangle {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: { page.send("font:" + page.entry.code + ":" + modelData); page.picking = false; }
+                            // Picking the default family stores "" (follow the language's default).
+                            onClicked: {
+                                page.send("font:" + page.entry.code + ":" + (parent.isDefault ? "" : modelData));
+                                page.picking = false;
+                            }
                         }
                     }
                 }

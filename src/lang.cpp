@@ -673,7 +673,11 @@ void publish() {
     const QStringList on = enabledCodes();
     for (const Lang &l : g_langs) {
         const QString code = l.code;
+        // The picker lists families only; the default one ("" in lang.conf) is marked, first in the list.
+        const QString defaultFamily = l.defaultFont.isEmpty() ? deviceDefault(l) : l.defaultFont;
         QStringList fams = familiesFor(code);
+        fams.removeAll(defaultFamily);
+        fams.prepend(defaultFamily);
         arr.append(QJsonObject{
             {"code", code}, {"name", l.name}, {"native", l.native},
             {"addon", !l.builtin},
@@ -687,7 +691,8 @@ void publish() {
             {"keyboardName", l.keyboardName},
             {"sample", l.sample},
             {"rtl", l.rtl},
-            {"font", fontOf(code)},
+            {"font", confValue(QStringLiteral("font.") + code)},     // the user's choice, "" = default
+            {"defaultFamily", defaultFamily},
             {"families", QJsonArray::fromStringList(fams)},
             {"deviceDefault", deviceDefault(l)},
             {"fontDir", kFontRoot + '/' + code},

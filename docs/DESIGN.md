@@ -290,8 +290,9 @@ A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tails
   summary ("Keyboard on · Font: NanumMyeongjo"). Tapping a row opens its page.
 - **Language page**: on/off, keyboard (with where to turn on the on-screen layout), font, a sample line in that
   font, priority ("Move up": shared Han characters use the first language's font), the folder for the user's fonts.
-- **Font popup**: the families for the language (the user's, the add-on's, the device's, "Default"), each shown
-  in its own face; one tap picks it.
+- **Font popup**: the families for the language (the user's, the add-on's, the device's), each shown in its own
+  face; the language's default family comes first, marked "· default" (picking it stores `font.<code>=` empty,
+  i.e. follow the default); one tap picks a font.
 
 Drill-down pages follow xochitl's own Settings (Wi-Fi network details); a popup is used only for the short font
 choice, where seeing the faces side by side helps. The page talks to the library through a `QQmlPropertyMap`
