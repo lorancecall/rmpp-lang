@@ -5,14 +5,15 @@ installed fresh. No transitional package, no `replaces=`, no settings carried ov
 
 ## Release order (each public step needs the developer's OK)
 
-1. Merge `feature/rmpp-lang` into `main` of `lorancecall/rmpp-korean`.
-2. Rename the repository to `lorancecall/rmpp-lang` (GitHub redirects old URLs).
-3. Tag v0.1.0 with the core assets `librmpp-lang.so`, `rmpp-lang.rcc`, `rmpp-lang` (tablet command), `LICENSE`.
+1. Merge `feature/rmpp-lang` into `main` of `lorancecall/rmpp-lang` (PR #1). The old repository
+   `lorancecall/rmpp-korean` was deleted by the developer; `lorancecall/rmpp-lang` was created fresh from the local
+   history (its `main` is rmpp-korean 0.1.0), so no rename step.
+2. Tag v0.1.0 with the core assets `librmpp-lang.so`, `rmpp-lang.rcc`, `rmpp-lang` (tablet command), `LICENSE`.
    Add-ons are built from `languages/<code>/` of the same tag (`tools/build-addon.sh`).
-4. rmpp-packages: core package `rmpp-lang`, generated `rmpp-lang-<code>` packages (Korean `rmpp-lang-ko`,
+3. rmpp-packages: core package `rmpp-lang`, generated `rmpp-lang-<code>` packages (Korean `rmpp-lang-ko`,
    `default=1`), installer entry from `rmpp-mod.conf`. Remove the `rmpp-korean` package from the repository and
    `mods.txt`.
-5. rmpp-hwr v0.3 reads `/home/root/.config/rmpp-lang/state.json` and `fonts.json`.
+4. rmpp-hwr v0.3 reads `/home/root/.config/rmpp-lang/state.json` and `fonts.json`.
 
 ## On the developer's tablet
 
