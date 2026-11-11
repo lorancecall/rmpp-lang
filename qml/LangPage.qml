@@ -228,7 +228,7 @@ Rectangle {
                 // Languages with a choice of input methods (zh: Hangul / pinyin / Hanja readings): "Change" goes
                 // to the next one.
                 readonly property var ms: detail.e.methods || []
-                visible: !!detail.e.enabled && ms.length > 1
+                visible: !!detail.e.enabled && ms.length > 1 && !detail.e.methodToggle
                 label: "Input: " + ((detail.e.methodNames || {})[detail.e.method] || detail.e.method || "")
                 description: "Ways to type " + (detail.e.name || "") + ": "
                     + ms.map(function (m) { return (detail.e.methodNames || {})[m] || m; }).join(" · ")
@@ -240,6 +240,26 @@ Rectangle {
                         const ms = detail.e.methods || [];
                         const next = ms[(ms.indexOf(detail.e.method) + 1) % ms.length];
                         page.send("method:" + detail.e.code + ":" + next);
+                    }
+                }
+            }
+            ArkControls.Panel {
+                // A method that is an option on top of the default one (ko: Old Hangul): a switch.
+                readonly property string opt: detail.e.methodToggle || ""
+                readonly property bool isOn: detail.e.method === opt
+                visible: !!detail.e.enabled && opt !== ""
+                label: ((detail.e.methodNames || {})[opt] || opt)
+                description: detail.e.methodDescription || ""
+                Layout.fillWidth: true
+                action: ArkControls.Toggle {
+                    checked: parent.isOn
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -20
+                        onClicked: {
+                            const p = parent.parent;
+                            page.send("method:" + detail.e.code + ":" + (p.isOn ? (detail.e.methods || [""])[0] : p.opt));
+                        }
                     }
                 }
             }

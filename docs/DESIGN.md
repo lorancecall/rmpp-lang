@@ -217,7 +217,7 @@ Hanja (button 変 for ja, 汉 for zh; Hanja key / F9).
 
 ### Old Hangul (ko input method "old")
 
-Settings > Languages > Korean > Input > Old Hangul (indicator 옛). The 옛 button on the format bar opens rows of
+Settings > Languages > Korean > Old Hangul (a switch: `method_toggle=old`; indicator 옛). The 옛 button on the format bar opens rows of
 letters: archaic letters ㆍ ㅿ ㆆ ㆁ ㅸ ㅱ ㆄ ㆅ ㅹ, initial clusters ᄢ ᄣ ᄧ ᄩ ᄠ ᄡ ᄭ ᄯ ᄲ ᄶ, the sibilants used for
 Mandarin in Hongmu Jeongun Yeokhun ᄼ ᄾ ᅎ ᅐ ᅔ ᅕ, and the tone dots (방점) 〮 〯. A tap types the letter, and the
 Hangul engine composes it with the 2-beolsik keys: ㆍ+ㅣ = ㆎ, ㆍ+ㆍ = ᆢ, ㅿ ㆁ ㆆ ㅱ ㅸ ㆄ also as finals, ㄹㆆ ㄹㅿ finals.
@@ -318,6 +318,8 @@ convert_map=               # Hangul -> reading table for kana / pinyin; ja: dict
 convert_simplify=          # Traditional -> Simplified table for the candidates (zh hanja method)
 methods=                   # input methods the user can choose, first = default (zh: hangul pinyin hanja)
 method_name.<m>=           # how Settings names method <m>; key@<m>= overrides key for that method
+method_toggle=             # a method that is an on/off option on top of the first (ko: old) -> a switch in Settings
+method_description=        # text under that switch
 requires=                  # add-ons this one needs, comma list (ja, zh: ko, whose layout they type on); the
                            # packages depend on rmpp-lang-<code> and the installer selects them too
 keyboard_default=1         # 0 = keyboard off until the user turns it on (ja, zh)

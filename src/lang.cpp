@@ -823,6 +823,8 @@ void publish() {
             {"layouts", QJsonArray::fromStringList(l.layouts)},
             {"keyboardName", l.keyboardName},
             {"methods", QJsonArray::fromStringList(l.methods)},
+            {"methodToggle", l.kv.value(QStringLiteral("method_toggle"))},   // ko: old = an on/off option
+            {"methodDescription", l.kv.value(QStringLiteral("method_description"))},
             {"method", l.method},
             {"methodNames", [&] {
                  QJsonObject o;
