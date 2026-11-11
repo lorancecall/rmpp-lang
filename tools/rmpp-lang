@@ -1,0 +1,131 @@
+#!/bin/sh
+# rmpp-lang: languages and fonts on the tablet (installed as /usr/bin/rmpp-lang).
+# The xochitl add-on picks up changes to the settings file and the font folders within a few seconds.
+CONF_DIR=/home/root/.config/rmpp-lang
+CONF=$CONF_DIR/lang.conf
+STATE=$CONF_DIR/state.json
+FONTS=/home/root/.local/share/fonts/rmpp-lang
+ADDONS=/home/root/.local/share/rmpp-lang/languages
+# Built-in languages, then the installed add-ons (one folder with a language.conf each).
+CODES="en latin$(for d in "$ADDONS"/*/language.conf; do [ -f "$d" ] && printf ' %s' "$(basename "$(dirname "$d")")"; done)"
+
+usage() {
+  cat <<'USAGE'
+Usage: rmpp-lang COMMAND
+  status                              languages, keyboards and fonts (from the add-on)
+  lang list | lang on CODE | lang off CODE | lang first CODE
+  keyboard CODE on|off
+  font add FILE... --lang CODE [--use]   install .ttf/.otf/.ttc for a language (--use: make it the font)
+  font list [--lang CODE]
+  font use FAMILY --lang CODE         "" = back to the default
+  font rm FILE_NAME --lang CODE
+  probe [trace on|off]                write the fonts in use to /tmp/rmpp-lang-probe.txt
+Codes: en latin + installed add-ons (latin = typed Latin text, experimental)
+USAGE
+  exit "${1:-0}"
+}
+
+die() { echo "rmpp-lang: $*" >&2; exit 1; }
+valid_code() { for c in $CODES; do [ "$c" = "$1" ] && return 0; done; die "unknown language code '$1' (use: $CODES)"; }
+
+get_key() { [ -f "$CONF" ] && sed -n "s/^$1=//p" "$CONF" | tail -n 1; }
+set_key() {
+  mkdir -p "$CONF_DIR"
+  [ -f "$CONF" ] || echo "# rmpp-lang settings (Settings > Languages and the rmpp-lang command write this file)" > "$CONF"
+  grep -v "^$1=" "$CONF" > "$CONF.new" || true
+  printf '%s=%s\n' "$1" "$2" >> "$CONF.new"
+  mv "$CONF.new" "$CONF"
+}
+languages() { l=$(get_key languages); echo "${l:-en}"; }
+
+family_of() { fc-scan --format '%{family[0]}\n' "$1" 2>/dev/null | head -n 1; }
+
+wait_state() {   # let the add-on rewrite state.json
+  before=$(stat -c %Y "$STATE" 2>/dev/null || echo 0)
+  i=0; while [ $i -lt 8 ]; do
+    sleep 1; now=$(stat -c %Y "$STATE" 2>/dev/null || echo 0)
+    [ "$now" != "$before" ] && return 0; i=$((i + 1))
+  done
+  echo "(the add-on did not answer: is xochitl running with rmpp-lang?)" >&2
+}
+
+cmd=$1; [ -n "$cmd" ] || usage 1; shift
+case "$cmd" in
+  status)
+    [ -f "$STATE" ] && cat "$STATE" || die "no state yet ($STATE): is rmpp-lang loaded in xochitl?" ;;
+  lang)
+    sub=$1; code=$2
+    case "$sub" in
+      list) echo "enabled (priority order): $(languages)"; echo "installed: $CODES" ;;
+      on)  valid_code "$code"; l=$(languages); echo ",$l," | grep -q ",$code," || set_key languages "$l,$code"; echo "on: $code" ;;
+      off) valid_code "$code"; [ "$code" = en ] && die "en stays on"
+           set_key languages "$(echo ",$(languages)," | sed "s/,$code,/,/; s/^,//; s/,$//")"; echo "off: $code" ;;
+      first) valid_code "$code"
+           set_key languages "$(echo "$code,$(echo ",$(languages)," | sed "s/,$code,/,/; s/^,//; s/,$//")" | sed 's/,$//')"
+           echo "order: $(languages)" ;;
+      *) usage 1 ;;
+    esac ;;
+  keyboard)
+    valid_code "$1"; case "$2" in on) set_key "keyboard.$1" 1 ;; off) set_key "keyboard.$1" 0 ;; *) usage 1 ;; esac
+    echo "keyboard $1: $2" ;;
+  font)
+    sub=$1; shift
+    files=""; code=""; use=0; fam=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --lang) code=$2; shift 2 ;;
+        --use) use=1; shift ;;
+        *) if [ "$sub" = use ] && [ -z "$fam" ]; then fam=$1; else files="$files
+$1"; fi; shift ;;
+      esac
+    done
+    case "$sub" in
+      add)
+        [ -n "$code" ] || die "font add needs --lang CODE"; valid_code "$code"
+        [ -n "$files" ] || die "font add needs a file"
+        mkdir -p "$FONTS/$code"
+        old_ifs=$IFS; IFS='
+'
+        for f in $files; do
+          IFS=$old_ifs
+          [ -n "$f" ] || continue
+          [ -f "$f" ] || die "no such file: $f"
+          case "$f" in *.ttf|*.otf|*.ttc|*.TTF|*.OTF|*.TTC) ;; *) die "not a font file: $f" ;; esac
+          cp "$f" "$FONTS/$code/$(basename "$f").new" && mv "$FONTS/$code/$(basename "$f").new" "$FONTS/$code/$(basename "$f")"
+          echo "added $(basename "$f") ($(family_of "$f")) for $code"
+        done
+        if [ $use = 1 ]; then
+          f=$(echo "$files" | sed -n '2p'); fam=$(family_of "$f")
+          [ -n "$fam" ] && set_key "font.$code" "$fam" && echo "font for $code: $fam"
+        fi
+        [ "$code" = latin ] || { echo ",$(languages)," | grep -q ",$code," || echo "note: $code is off (rmpp-lang lang on $code)"; }
+        touch "$FONTS/$code"; wait_state ;;
+      list)
+        for c in $CODES; do
+          [ -n "$code" ] && [ "$c" != "$code" ] && continue
+          echo "$c: font=$(get_key "font.$c")"
+          for f in "$FONTS/$c"/*; do [ -f "$f" ] && echo "  $(basename "$f")  ($(family_of "$f"))"; done
+        done ;;
+      use)
+        [ -n "$code" ] || die "font use needs --lang CODE"; valid_code "$code"
+        set_key "font.$code" "$fam"; echo "font for $code: ${fam:-default}"; wait_state ;;
+      rm)
+        [ -n "$code" ] || die "font rm needs --lang CODE"; valid_code "$code"
+        f=$(echo "$files" | sed -n '2p'); [ -f "$FONTS/$code/$f" ] || die "no font $f for $code"
+        fam=$(family_of "$FONTS/$code/$f"); rm -f "$FONTS/$code/$f"
+        [ "$(get_key "font.$code")" = "$fam" ] && set_key "font.$code" ""
+        echo "removed $f"; touch "$FONTS/$code" 2>/dev/null; wait_state ;;
+      *) usage 1 ;;
+    esac ;;
+  probe)
+    mkdir -p "$CONF_DIR"
+    if [ "$1" = trace ]; then
+      case "$2" in on) touch "$CONF_DIR/trace" ;; off) rm -f "$CONF_DIR/trace" ;; *) usage 1 ;; esac
+      echo "trace $2 (font calls are logged while on)"; exit 0
+    fi
+    rm -f /tmp/rmpp-lang-probe.txt; touch "$CONF_DIR/probe"
+    i=0; while [ ! -s /tmp/rmpp-lang-probe.txt ] && [ $i -lt 10 ]; do sleep 1; i=$((i + 1)); done
+    cat /tmp/rmpp-lang-probe.txt 2>/dev/null || die "no answer from the add-on" ;;
+  -h|--help|help) usage 0 ;;
+  *) usage 1 ;;
+esac

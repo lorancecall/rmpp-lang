@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/rmpplang">
+    <file>qml/LangSidebarItem.qml</file>
+    <file>qml/LangPage.qml</file>
+    <file>icons/language.svg</file>
+  </qresource>
+</RCC>

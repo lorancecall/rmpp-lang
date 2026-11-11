@@ -1,12 +1,25 @@
-# rmpp-korean
+# rmpp-lang
 
-Korean (Hangul) input and Korean fonts for the reMarkable Paper Pro, on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs without xovi and keeps working after a reboot.
+Languages for the reMarkable Paper Pro: a keyboard and a font for each language, on the on-screen keyboard and on
+Type Folio, Bluetooth and USB keyboards. Runs without xovi and keeps working after a reboot.
 
-Tested on reMarkable Paper Pro, OS 3.29.1.0.
+Tested on reMarkable Paper Pro, OS 3.29.1.
+
+rmpp-lang is a small core plus one add-on per language. You pick the languages in the installer:
+
+| Add-on | Keyboard | Font (default) |
+|---|---|---|
+| `ko` Korean | 2-beolsik on screen; Hangul composed from physical keys too | Noto Sans KR |
+| `ru` Russian | ЙЦУКЕН on screen and on physical keyboards | reMarkable's own (covers Cyrillic) |
+| `ja` Japanese | later (needs a kana-kanji input method) | Noto Sans JP |
+| `zh` Chinese | later (needs a pinyin input method) | Noto Sans SC |
+
+English is always there. More languages are welcome: see [Add a language](docs/FONTS.md#add-a-language).
 
 ## Install
 
-Use the installer from [rmpp-packages](https://github.com/lorancecall/rmpp-packages). It installs Vellum if needed, then this package (and [rmpp-bt](https://github.com/lorancecall/rmpp-bt) for Bluetooth).
+Use the installer from [rmpp-packages](https://github.com/lorancecall/rmpp-packages). It installs Vellum if needed,
+then rmpp-lang with the languages you select (Korean is preselected).
 
 **Windows (PowerShell):**
 
@@ -22,44 +35,80 @@ curl -fsSL https://lorancecall.github.io/rmpp-packages/install-rmpp.sh -o instal
 sh install-rmpp.sh
 ```
 
-You need developer mode turned on. The installer asks for the tablet's root password once (Settings > General > Help > About > Copyrights and licenses). If you already use Vellum, add the repository and run `vellum add rmpp-korean` instead. After a reMarkable OS update, run the installer again (or `vellum reenable`).
+You need developer mode turned on. The installer asks for the tablet's root password once (Settings > General >
+Help > About > Copyrights and licenses). If you already use Vellum, add the repository and run
+`vellum add rmpp-lang rmpp-lang-ko` (one `rmpp-lang-<code>` per language). After a reMarkable OS update, run the
+installer again (or `vellum reenable`).
 
 ## Use
 
-- **On-screen keyboard:** in Settings > Language & keyboard, turn on **Korean**, then switch with the globe key. Jamo join into syllables as you type (ㅎ ㅏ ㄴ → 한), and backspace removes one jamo at a time. The layout is 2-beolsik; Shift gives ㅃ ㅉ ㄸ ㄲ ㅆ ㅒ ㅖ.
-- **Type Folio, Bluetooth and USB keyboards:** **Ctrl+Space** or **right Alt / right Cmd** switches between English and Korean. The on-screen keyboard follows the same language.
-- **Indicator:** a **한 / EN** button on the format bar above the keyboard shows the current language; tap it to switch.
-- **External keyboards:** while a Bluetooth or USB keyboard is connected, the on-screen keys fold away and the format bar stays. With rmpp-bt you can set a keyboard to **Type Folio mode** instead (the typing layout and format button of a real Type Folio).
-- **Fonts:** Noto Sans CJK KR Regular and Bold (SIL OFL 1.1) in `/home/root/.local/share/fonts/rmpp-korean`. The device already ships Noto Sans KR.
+- **Settings > Languages** (above Handwriting): the installed languages in keyboard order (▲▼ to reorder), and a
+  page per language to turn its keyboard on or off and choose its font, with a sample line.
+- **On-screen keyboard:** turn the language on in Settings > Language & keyboard, then switch with the globe key.
+  Korean jamo join into syllables as you type (ㅎ ㅏ ㄴ → 한); backspace removes one jamo at a time; Shift gives
+  ㅃ ㅉ ㄸ ㄲ ㅆ ㅒ ㅖ.
+- **Type Folio, Bluetooth and USB keyboards:** **Ctrl+Space** or **right Alt / right Cmd** cycles through English
+  and the languages with a keyboard, in Settings order. The on-screen keyboard follows.
+- **Indicator:** a button on the format bar above the keyboard shows the current language (EN, 한, RU, ...); tap
+  it to switch.
+- **External keyboards:** while a Bluetooth or USB keyboard is connected, the on-screen keys fold away and the
+  format bar stays. With [rmpp-bt](https://github.com/lorancecall/rmpp-bt) you can set a keyboard to **Type Folio
+  mode** instead.
+
+## Fonts
+
+Each language uses one font everywhere its script appears: typed text, the keyboard, file names and the rest of
+the tablet. Fonts change at once, without a restart. The defaults are the Noto fonts that come with the tablet.
+
+Add your own (`.ttf`, `.otf`, `.ttc`) from your computer with [tools/rmpp-lang.py](tools/rmpp-lang.py), or on the
+tablet:
+
+```sh
+rmpp-lang font add /home/root/MyFont-Regular.ttf --lang ko --use
+rmpp-lang font list
+```
+
+Full guide with language codes: **[docs/FONTS.md](docs/FONTS.md)**.
+
+## For other add-ons
+
+rmpp-lang writes `/home/root/.config/rmpp-lang/state.json` (languages, order, keyboards, fonts) and `fonts.json`
+(one family and a readable font file per language), so other add-ons can follow the user's languages and fonts;
+[rmpp-hwr](https://github.com/lorancecall/rmpp-hwr) draws converted ink with them. Format: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## How it works
 
-`libhangul.so` is loaded into xochitl at boot by `rmpp-preload` (a launcher that adds `/usr/lib/rmpp-preload.d/*.so` to `LD_PRELOAD`, after xovi's if xovi is in use). It registers `ko_KR.rcc`, which adds `:/misc/keyboards/ko_KR/keyboard_layout.json` next to the built-in layouts. An application event filter rewrites single-jamo input-method commits into composed syllables with replace-previous-character commits, and maps physical-keyboard letters to jamo in Korean mode.
+`librmpp-lang.so` is loaded into xochitl at boot by `rmpp-preload` (a launcher that adds
+`/usr/lib/rmpp-preload.d/*.so` to `LD_PRELOAD`, after xovi's if xovi is in use). It finds the language add-ons in
+`/home/root/.local/share/rmpp-lang/languages/`, registers their on-screen layouts (`<code>.rcc`) next to the
+built-in ones, sets one fallback font per script with `QFontDatabase::setApplicationFallbackFontFamilies`, maps
+physical-keyboard keys per language, and composes Hangul for add-ons with `input=compose:hangul`. The Settings page
+is QML from `rmpp-lang.rcc`.
 
-xochitl starts before `/home` is mounted, so the library and layout live in `/usr/lib/rmpp-korean`. The root file system is read-only and an OS update replaces it, which is why the package restores these files with `vellum reenable`.
+xochitl starts before `/home` is mounted, so the library and the layouts live in `/usr/lib/rmpp-lang`. The root
+file system is read-only and an OS update replaces it, which is why the packages restore these files with
+`vellum reenable`. Design, add-on format and tablet findings: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Build
 
-Requires an aarch64 cross toolchain (Arm GNU `aarch64-none-linux-gnu`, GCC 14), Qt 6.10 headers (QtCore, QtGui, QtQml, QtQuick), the device's Qt libraries to link against, and `pyside6-rcc`.
+Requires an aarch64 cross toolchain (Arm GNU `aarch64-none-linux-gnu`, GCC 14), Qt 6.10 headers (QtCore, QtGui,
+QtQml, QtQuick), the device's Qt libraries to link against, and `pyside6-rcc`.
 
 ```sh
-SDK=/path/to/sdk sh build.sh     # build/libhangul.so, build/ko_KR.rcc, build/fonts/
-sh deploy.sh                     # development install over ssh (host alias "rmpp")
+SDK=/path/to/sdk sh build.sh           # build/librmpp-lang.so, build/rmpp-lang.rcc, build/rmpp-lang
+sh tools/build-addon.sh ko ru          # build/languages/<code>/ and build/languages/<code>.rcc
+ADDONS="ko ru" sh deploy.sh rmpp       # development install over ssh (host alias "rmpp")
+sh deploy.sh rmpp --remove             # remove it again
 ```
 
-Never run `systemctl stop xochitl` on the device: stopping it powers the tablet off. More than four xochitl restarts in ten minutes reboots it; `deploy.sh` runs `systemctl reset-failed xochitl` first.
+Never run `systemctl stop xochitl` on the device: stopping it powers the tablet off. More than four xochitl
+restarts in ten minutes reboots it; `deploy.sh` runs `systemctl reset-failed xochitl` first.
 
-## Status
+## History
 
-- [x] On-screen Korean layout and composition
-- [x] Physical keyboard toggle (Ctrl+Space, right Alt) synced with the on-screen keyboard
-- [x] 한 / EN indicator on the format bar
-- [x] Fonts
-- [x] Hide on-screen keys while an external keyboard is connected; per-keyboard Type Folio mode (with rmpp-bt)
-- [x] Vellum package ([rmpp-packages](https://github.com/lorancecall/rmpp-packages))
-- [ ] Indicator in Type Folio mode
-- [ ] Handwriting recognition for Korean
+rmpp-lang grew out of rmpp-korean 0.1.0 (Korean keyboard and fonts). There is no upgrade path: remove rmpp-korean
+(`vellum del rmpp-korean`) and install rmpp-lang with `rmpp-lang-ko`. See [docs/MIGRATION.md](docs/MIGRATION.md).
 
 ## License
 
-GPL-3.0-only. See [LICENSE](LICENSE). The fonts are under the SIL Open Font License 1.1.
+GPL-3.0-only. See [LICENSE](LICENSE). Fonts you add keep their own licenses.

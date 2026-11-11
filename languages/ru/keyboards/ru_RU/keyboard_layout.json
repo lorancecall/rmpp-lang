@@ -1,0 +1,273 @@
+{
+  "inherits": "en_US",
+  "alphabetic": [
+    [
+      {
+        "default": [
+          "й"
+        ],
+        "shifted": [
+          "Й"
+        ]
+      },
+      {
+        "default": [
+          "ц"
+        ],
+        "shifted": [
+          "Ц"
+        ]
+      },
+      {
+        "default": [
+          "у"
+        ],
+        "shifted": [
+          "У"
+        ]
+      },
+      {
+        "default": [
+          "к"
+        ],
+        "shifted": [
+          "К"
+        ]
+      },
+      {
+        "default": [
+          "е"
+        ],
+        "shifted": [
+          "Е"
+        ]
+      },
+      {
+        "default": [
+          "н"
+        ],
+        "shifted": [
+          "Н"
+        ]
+      },
+      {
+        "default": [
+          "г"
+        ],
+        "shifted": [
+          "Г"
+        ]
+      },
+      {
+        "default": [
+          "ш"
+        ],
+        "shifted": [
+          "Ш"
+        ]
+      },
+      {
+        "default": [
+          "щ"
+        ],
+        "shifted": [
+          "Щ"
+        ]
+      },
+      {
+        "default": [
+          "з"
+        ],
+        "shifted": [
+          "З"
+        ]
+      },
+      {
+        "default": [
+          "х"
+        ],
+        "shifted": [
+          "Х"
+        ]
+      },
+      {
+        "default": [
+          "ъ"
+        ],
+        "shifted": [
+          "Ъ"
+        ]
+      }
+    ],
+    [
+      {
+        "default": [
+          "ф"
+        ],
+        "shifted": [
+          "Ф"
+        ]
+      },
+      {
+        "default": [
+          "ы"
+        ],
+        "shifted": [
+          "Ы"
+        ]
+      },
+      {
+        "default": [
+          "в"
+        ],
+        "shifted": [
+          "В"
+        ]
+      },
+      {
+        "default": [
+          "а"
+        ],
+        "shifted": [
+          "А"
+        ]
+      },
+      {
+        "default": [
+          "п"
+        ],
+        "shifted": [
+          "П"
+        ]
+      },
+      {
+        "default": [
+          "р"
+        ],
+        "shifted": [
+          "Р"
+        ]
+      },
+      {
+        "default": [
+          "о"
+        ],
+        "shifted": [
+          "О"
+        ]
+      },
+      {
+        "default": [
+          "л"
+        ],
+        "shifted": [
+          "Л"
+        ]
+      },
+      {
+        "default": [
+          "д"
+        ],
+        "shifted": [
+          "Д"
+        ]
+      },
+      {
+        "default": [
+          "ж"
+        ],
+        "shifted": [
+          "Ж"
+        ]
+      },
+      {
+        "default": [
+          "э"
+        ],
+        "shifted": [
+          "Э"
+        ]
+      }
+    ],
+    [
+      {
+        "special": "shift"
+      },
+      {
+        "default": [
+          "я"
+        ],
+        "shifted": [
+          "Я"
+        ]
+      },
+      {
+        "default": [
+          "ч"
+        ],
+        "shifted": [
+          "Ч"
+        ]
+      },
+      {
+        "default": [
+          "с"
+        ],
+        "shifted": [
+          "С"
+        ]
+      },
+      {
+        "default": [
+          "м"
+        ],
+        "shifted": [
+          "М"
+        ]
+      },
+      {
+        "default": [
+          "и"
+        ],
+        "shifted": [
+          "И"
+        ]
+      },
+      {
+        "default": [
+          "т"
+        ],
+        "shifted": [
+          "Т"
+        ]
+      },
+      {
+        "default": [
+          "ь"
+        ],
+        "shifted": [
+          "Ь"
+        ]
+      },
+      {
+        "default": [
+          "б"
+        ],
+        "shifted": [
+          "Б"
+        ]
+      },
+      {
+        "default": [
+          "ю"
+        ],
+        "shifted": [
+          "Ю"
+        ]
+      },
+      {
+        "special": "backspace"
+      }
+    ]
+  ]
+}
