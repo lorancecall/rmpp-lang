@@ -4,6 +4,11 @@
 > other languages as add-ons in `languages/`, fonts per language. See [docs/DESIGN.md](docs/DESIGN.md) and
 > [docs/MIGRATION.md](docs/MIGRATION.md). The text below describes the released rmpp-korean 0.1.0.
 
+## Fonts
+
+Each language uses one font, chosen in **Settings > Languages**. To add your own fonts for a language (language
+codes, commands from your computer or on the tablet), see **[docs/FONTS.md](docs/FONTS.md)**.
+
 Korean (Hangul) input and Korean fonts for the reMarkable Paper Pro, on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs without xovi and keeps working after a reboot.
 
 Tested on reMarkable Paper Pro, OS 3.29.1.0.

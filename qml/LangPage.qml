@@ -142,12 +142,17 @@ Rectangle {
                 Layout.topMargin: ArkControls.Values.spacing.large
             }
             ArkControls.Panel {
-                label: "Add a language or a font"
-                description: "Languages are add-ons: choose them in the rmpp installer. Fonts: rmpp-lang font add "
-                             + "MyFont.ttf --lang CODE from your computer, or copy .ttf / .otf files into "
-                             + "/home/root/.local/share/fonts/rmpp-lang/ followed by the language code (ko, ja, zh, latin, ...)."
+                label: "Add a language"
+                description: "Choose more languages in the rmpp installer on your computer."
                 Layout.fillWidth: true
                 Layout.topMargin: ArkControls.Values.spacing.large
+            }
+            ArkControls.Panel {
+                label: "Add a font"
+                description: "Add .ttf or .otf files for a language from your computer.
+"
+                             + "How to: github.com/lorancecall/rmpp-lang#fonts"
+                Layout.fillWidth: true
             }
         }
     }
