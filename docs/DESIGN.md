@@ -307,9 +307,9 @@ rmpp-lang probe [trace on|off]       # fonts in use, for debugging (/tmp/rmpp-la
 python tools/rmpp-lang.py --host rmpp font get "Nanum Myeongjo" --lang ko --use    # from a computer
 ```
 
-## Migration from rmpp-korean
+## From rmpp-korean
 
-See [MIGRATION.md](MIGRATION.md).
+No migration: rmpp-korean is removed and rmpp-lang installed fresh; release order in [MIGRATION.md](MIGRATION.md).
 
 ## Open questions
 
