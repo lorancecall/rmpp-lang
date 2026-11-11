@@ -296,7 +296,8 @@ A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tails
   font, priority ("Move up": shared Han characters use the first language's font), the folder for the user's fonts.
 - **Font popup**: the families for the language (the user's, the add-on's, the device's), each shown in its own
   face; the language's default family comes first, marked "· default" (picking it stores `font.<code>=` empty,
-  i.e. follow the default); one tap picks a font.
+  i.e. follow the default); one tap picks a font. Fonts are added and removed outside Settings (decided: no
+  remove button): with `rmpp-lang font add|rm` on the tablet or `tools/rmpp-lang.py` from a computer.
 
 Drill-down pages follow xochitl's own Settings (Wi-Fi network details); a popup is used only for the short font
 choice, where seeing the faces side by side helps. The page talks to the library through a `QQmlPropertyMap`
