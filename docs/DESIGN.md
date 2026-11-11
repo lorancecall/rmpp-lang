@@ -76,7 +76,7 @@ Convert to ink) draw with it and offer no font choice of their own.
 { "version": 1,
   "languages": {
     "ko":    { "family": "Noto Sans CJK KR", "file": "/home/root/.local/share/rmpp-lang/languages/ko/fonts/NotoSansCJKkr-Regular.otf", "chosen": "" },
-    "ja":    { "family": "Noto Sans CJK JP", "file": "/home/root/.local/share/fonts/NotoSansJPFont/NotoSansCJKjp-Regular.otf", "chosen": "Noto Sans CJK JP" },
+    "ja":    { "family": "Noto Sans JP", "file": "/usr/share/fonts/ttf/noto/NotoSansJP-VariableFont_wght.ttf", "chosen": "" },
     "en":    { "family": "Noto Sans", "file": "/usr/share/fonts/ttf/noto/NotoSans-VariableFont_wdth,wght.ttf", "chosen": "" },
     "latin": { "family": "Noto Sans", "file": "/usr/share/fonts/ttf/noto/NotoSans-VariableFont_wdth,wght.ttf", "chosen": "" } } }
 ```
@@ -86,6 +86,8 @@ Convert to ink) draw with it and offer no font choice of their own.
   match (`fc-match "<family>:style=Regular"`). xochitl's own "reMarkable Sans" (en/latin default) is not a file:
   fontconfig's substitute is given and `family` names it. Files may be variable fonts or .ttc collections.
 - Every installed language has an entry (enabled or not); use state.json for which are on.
+- Fonts outside rmpp-lang's folders (the OS's `/usr/share/fonts`, fonts a user put anywhere fontconfig looks, e.g.
+  `/home/root/.local/share/fonts/<any>/`) are offered and used but never moved or deleted by rmpp-lang.
 
 ## Fonts
 
@@ -177,7 +179,7 @@ here, so this ranking is weak and should be checked by hand):
 
 | Language | Kind | Font on device | Work |
 |---|---|---|---|
-| Japanese, Chinese | conversion IME | Noto Sans JP / SC (+ CJK JP/SC/TC downloaded by xochitl) | large: candidate bar + dictionary |
+| Japanese, Chinese | conversion IME | Noto Sans JP / SC (OS, variable) | large: candidate bar + dictionary |
 | Russian, Ukrainian | alphabet (Cyrillic) | Noto Sans | small: layout json (bg_BG shows Cyrillic works) + physical key map |
 | Turkish | alphabet (Latin + ğ ı ş) | Noto Sans, reMarkable Sans | small |
 | Polish, Romanian, Croatian, Lithuanian, Latvian on the **Type Folio** (AltGr letters) | physical key map | yes | small: the on-screen layouts exist; physical AltGr mapping in the event filter |
