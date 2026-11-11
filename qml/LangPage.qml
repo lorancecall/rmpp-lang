@@ -20,6 +20,7 @@ Rectangle {
     }
     property string current: ""          // language code whose page is open, "" = the list
     property bool picking: false         // font popup open
+    property bool pickingMethod: false   // input-method popup open (zh)
     readonly property var entry: {
         for (let i = 0; i < entries.length; ++i) if (entries[i].code === current) return entries[i];
         return null;
@@ -59,7 +60,7 @@ Rectangle {
     z: 10
     color: "white"
     visible: settingsRoot._selectedPage === langPage
-    onVisibleChanged: if (!visible) { current = ""; picking = false; }
+    onVisibleChanged: if (!visible) { current = ""; picking = false; pickingMethod = false; }
 
     ArkControls.PlaceholderBar {
         id: placeholder
@@ -225,8 +226,8 @@ Rectangle {
                 }
             }
             ArkControls.Panel {
-                // Languages with a choice of input methods (zh: Hangul / pinyin / Hanja readings): "Change" goes
-                // to the next one.
+                // Languages with a choice of input methods (zh: Hangul / pinyin / Hanja readings): "Change" opens
+                // a popup like the font's.
                 readonly property var ms: detail.e.methods || []
                 visible: !!detail.e.enabled && ms.length > 1 && !detail.e.methodToggle
                 label: "Input: " + ((detail.e.methodNames || {})[detail.e.method] || detail.e.method || "")
@@ -236,11 +237,7 @@ Rectangle {
                 action: ArkControls.Button {
                     text: "Change"
                     type: ArkTokens.Button.secondary
-                    onClicked: {
-                        const ms = detail.e.methods || [];
-                        const next = ms[(ms.indexOf(detail.e.method) + 1) % ms.length];
-                        page.send("method:" + detail.e.code + ":" + next);
-                    }
+                    onClicked: page.pickingMethod = true
                 }
             }
             ArkControls.Panel {
@@ -291,6 +288,73 @@ Rectangle {
                 label: "Your fonts for " + (detail.e.name || "")
                 description: detail.e.fontDir || ""
                 Layout.fillWidth: true
+            }
+        }
+    }
+
+    // ---- input-method popup (zh) ----
+    MouseArea {
+        anchors.fill: parent
+        visible: page.pickingMethod
+        z: 20
+        onClicked: page.pickingMethod = false
+    }
+    Rectangle {
+        visible: page.pickingMethod && page.entry !== null
+        z: 21
+        width: parent.width * 0.8
+        height: methodColumn.implicitHeight + 64
+        anchors.centerIn: parent
+        color: "white"
+        border.color: "black"
+        border.width: 3
+        radius: 12
+        ColumnLayout {
+            id: methodColumn
+            anchors.fill: parent
+            anchors.margins: 32
+            spacing: ArkControls.Values.spacing.medium
+            ArkControls.Title {
+                type: ArkControls.Title.Medium
+                text: "Input for " + (page.entry ? page.entry.name : "")
+                Layout.fillWidth: true
+            }
+            Repeater {
+                model: page.entry ? (page.entry.methods || []) : []
+                delegate: Rectangle {
+                    required property var modelData
+                    required property int index
+                    readonly property bool chosen: page.entry && page.entry.method === modelData
+                    Layout.fillWidth: true
+                    implicitHeight: 104
+                    color: chosen ? "black" : "white"
+                    border.color: "black"
+                    border.width: 2
+                    radius: 8
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: 24
+                        width: parent.width - 48
+                        text: ((page.entry && page.entry.methodNames) ? page.entry.methodNames[modelData] : modelData)
+                              + (index === 0 ? "  · default" : "")
+                        color: chosen ? "white" : "black"
+                        font.pixelSize: 30
+                        elide: Text.ElideRight
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            page.send("method:" + page.entry.code + ":" + modelData);
+                            page.pickingMethod = false;
+                        }
+                    }
+                }
+            }
+            ArkControls.Button {
+                text: "Cancel"
+                type: ArkTokens.Button.secondary
+                Layout.alignment: Qt.AlignHCenter
+                onClicked: page.pickingMethod = false
             }
         }
     }
