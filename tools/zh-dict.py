@@ -166,6 +166,21 @@ def main():
             m.setdefault(h, [])
             if py not in m[h]:
                 m[h].append(py)
+    # Old letters narrow the reading (optional): the first syllable with an old initial, as conjoining jamo the way
+    # the Hangul engine writes it (L + V + T): ᅎ ᅔ ᄼ = z c s, ᅐ ᅕ ᄾ = zh ch sh, ㅿ = r, ㆄ = f.
+    old_initial = {"z": 0x114E, "c": 0x1154, "s": 0x113C, "zh": 0x1150, "ch": 0x1155, "sh": 0x113E, "r": 0x1140,
+                   "f": 0x1157}
+    for py in syllables:
+        ini = split(py)[0]
+        if ini not in old_initial:
+            continue
+        for h in spellings(py):
+            code = ord(h[0]) - 0xAC00
+            v, t = (code % 588) // 28, code % 28
+            key = chr(old_initial[ini]) + chr(0x1161 + v) + (chr(0x11A7 + t) if t else "") + h[1:]
+            m.setdefault(key, [])
+            if py not in m[key]:
+                m[key].append(py)
     with open(f"{out_dir}/zh.map", "w", encoding="utf-8", newline="\n") as f:
         f.write("# Hangul -> pinyin for rmpp-lang (tools/zh-dict.py)\n")
         for h in sorted(m):

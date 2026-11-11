@@ -50,12 +50,16 @@
 
 namespace {
 
-constexpr int kMaxRun = 10;       // syllables looked at before the cursor
+constexpr int kMaxRun = 16;       // characters looked at before the cursor (old syllables take 2-3)
 constexpr int kMaxCands = 300;    // candidates shown in total
 constexpr int kMaxReadings = 48;  // readings tried per run (kana / pinyin)
 constexpr int kMaxNodes = 4000;   // search steps per run
 
-bool isSyllable(QChar c) { return c.unicode() >= 0xAC00 && c.unicode() <= 0xD7A3; }
+// Hangul before the cursor: precomposed syllables, or conjoining jamo of old syllables (ᅐᅮᆼ).
+bool isSyllable(QChar c) {
+    const char16_t u = c.unicode();
+    return (u >= 0xAC00 && u <= 0xD7A3) || (u >= 0x1100 && u <= 0x11FF) || (u >= 0xA960 && u <= 0xA97F) || (u >= 0xD7B0 && u <= 0xD7FF);
+}
 
 // ---- dictionary ----
 

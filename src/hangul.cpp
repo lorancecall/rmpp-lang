@@ -13,6 +13,7 @@
 #include <QtGui/QInputMethodEvent>
 #include <QtGui/QKeyEvent>
 #include <QtGui/QInputMethod>
+#include <QtCore/QDateTime>
 #include <QtCore/QFile>
 #include <QtCore/QTimer>
 #include <QtCore/QMetaMethod>
@@ -23,6 +24,7 @@
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
+#include <functional>
 #include <vector>
 
 namespace {
@@ -155,10 +157,41 @@ QString render(const Parsed &p) {
 bool g_korean = false;              // the input language composes Hangul
 bool composesHangul() { return rmpplang::inputMethod(rmpplang::currentInput()) == QLatin1String("compose:hangul"); }
 void applyInput(const char *why);
+void noteJamo(char16_t j);          // a jamo was typed (swipe.cpp part below)
 
 class HangulFilter : public QObject {
 public:
     using QObject::QObject;
+
+    // A swipe on a key: the jamo it just typed becomes an old letter (ㅈ -> ᅎ). Called after the commit was applied.
+    void replaceLast(char16_t from, char16_t to) {
+        QObject *obj = QGuiApplication::focusObject();
+        if (!obj || block.empty() || block.back() != from || !stillComposing(obj)) return;
+        const int prevLen = int(lastOut.size());
+        std::vector<char16_t> grown = block;
+        grown.back() = to;
+        const Parsed p = parse(grown);
+        QString out;
+        if (p.ok) {
+            block = grown;
+            lastOut = render(p);
+            out = lastOut;
+        } else {                       // e.g. 맛 + swipe on ㅅ -> 마 + ᄼ (an old initial cannot be a final)
+            std::vector<char16_t> prev(block.begin(), block.end() - 1);
+            const Parsed pp = parse(prev);
+            if (prev.empty() || !pp.ok) return;
+            block.assign(1, to);
+            lastOut = render(parse(block));
+            out = render(pp) + lastOut;
+        }
+        QInputMethodEvent im;
+        im.setCommitString(out, -prevLen, prevLen);
+        ownSend = true;
+        QCoreApplication::sendEvent(obj, &im);
+        ownSend = false;
+        owner = obj;
+        lastCursor = cursorOf(obj);
+    }
 
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override {
@@ -248,6 +281,7 @@ private:
         }
 
         const char16_t j = commit.at(0).unicode();
+        noteJamo(j);
         if (!stillComposing(obj)) block.clear();
 
         if (!block.empty()) {
@@ -517,7 +551,7 @@ void applyInput(const char *why) {
         g_state->insert(QStringLiteral("korean"), on);
         g_state->insert(QStringLiteral("label"), rmpplang::inputLabel());
         g_state->insert(QStringLiteral("enabled"), rmpplang::inputCycle().size() > 1);
-        g_state->insert(QStringLiteral("old"), on && rmpplang::inputChoice(cur) == QLatin1String("old"));
+        g_state->insert(QStringLiteral("old"), on && rmpplang::oldLetters(cur));
     }
     // Keep the on-screen keyboard on the same language (only if that layout is one of its enabled languages).
     if (qstrcmp(why, "screen") == 0) return;
@@ -700,6 +734,137 @@ void syncIndicator() {
     }
 }
 
+// ---- old letters by swiping a key (with old_letters on) ----
+// On-screen keys type on press; a swipe that ends more than kSwipe px left / right / up replaces the jamo the key
+// just typed: ㅈ ㅊ ㅅ left = 치두음 ᅎ ᅔ ᄼ (z c s), right = 정치음 ᅐ ᅕ ᄾ (zh ch sh) -- the long stroke of the
+// letter points that way --, up = the other old letter of the key. Small marks on those keys show the targets.
+constexpr qreal kSwipe = 40;
+struct SwipeTarget { char16_t key, left, right, up; };
+const SwipeTarget SWIPES[] = {
+    {u'ㅈ', 0x114E, 0x1150, 0}, {u'ㅊ', 0x1154, 0x1155, 0}, {u'ㅅ', 0x113C, 0x113E, u'ㅿ'},
+    {u'ㄹ', 0, 0, u'ㅿ'}, {u'ㅇ', 0, 0, u'ㆁ'}, {u'ㅎ', 0, 0, u'ㆆ'}, {u'ㅂ', 0, 0, u'ㅸ'},
+    {u'ㅁ', 0, 0, u'ㅱ'}, {u'ㅍ', 0, 0, u'ㆄ'}, {u'ㅏ', 0, 0, u'ㆍ'},
+};
+char16_t swipeTarget(char16_t key, char dir) {
+    for (const auto &s : SWIPES)
+        if (s.key == key) return dir == 'L' ? s.left : dir == 'R' ? s.right : dir == 'U' ? s.up : 0;
+    return 0;
+}
+
+HangulFilter *g_hangul = nullptr;
+char16_t g_lastJamo = 0;
+qint64 g_lastJamoMs = 0, g_touchBeginMs = -1, g_pendingUntil = 0;
+char g_pendingDir = 0;
+
+bool oldLettersOn() { return composesHangul() && rmpplang::oldLetters(rmpplang::currentInput()); }
+
+void applySwipe(char16_t jamo, char dir) {
+    const char16_t to = swipeTarget(jamo, dir);
+    if (!to || !g_hangul) return;
+    QTimer::singleShot(0, g_hangul, [jamo, to] { g_hangul->replaceLast(jamo, to); });
+}
+
+void noteJamo(char16_t j) {
+    g_lastJamo = j;
+    g_lastJamoMs = QDateTime::currentMSecsSinceEpoch();
+    if (g_pendingDir && g_lastJamoMs <= g_pendingUntil) applySwipe(j, g_pendingDir);   // key typed on release
+    g_pendingDir = 0;
+}
+
+class SwipeFilter : public QObject {
+public:
+    using QObject::QObject;
+protected:
+    QPointF start;
+    bool eventFilter(QObject *obj, QEvent *ev) override {
+        const auto t = ev->type();
+        if (t != QEvent::TouchBegin && t != QEvent::TouchEnd) return false;
+        auto *w = qobject_cast<QQuickWindow *>(obj);
+        if (!w || !oldLettersOn()) return false;
+        auto *pe = static_cast<QPointerEvent *>(ev);
+        if (pe->points().isEmpty()) return false;
+        const QPointF p = pe->points().first().scenePosition();
+        if (t == QEvent::TouchBegin) {
+            QQuickItem *panel = findKeyboardPanel();
+            const bool onKeys = panel && panel->isVisible()
+                && panel->mapRectToScene(QRectF(0, 0, panel->width(), panel->height())).contains(p);
+            g_touchBeginMs = onKeys ? QDateTime::currentMSecsSinceEpoch() : -1;
+            start = p;
+            return false;
+        }
+        if (g_touchBeginMs < 0) return false;
+        const qreal dx = p.x() - start.x(), dy = p.y() - start.y();
+        char dir = 0;
+        if (qAbs(dx) >= kSwipe && qAbs(dx) > qAbs(dy)) dir = dx < 0 ? 'L' : 'R';
+        else if (-dy >= kSwipe && qAbs(dy) > qAbs(dx)) dir = 'U';
+        const qint64 begin = g_touchBeginMs;
+        g_touchBeginMs = -1;
+        if (!dir) return false;
+        if (g_lastJamoMs >= begin) applySwipe(g_lastJamo, dir);      // typed on press (as seen on 3.29)
+        else { g_pendingDir = dir; g_pendingUntil = QDateTime::currentMSecsSinceEpoch() + 400; }
+        return false;
+    }
+};
+
+// Marks of the swipe targets on the keys (left / right / top edge), while old letters are on.
+const char *kMarkQml = R"QML(
+import QtQuick
+Item {
+    id: m
+    property Item key
+    anchors.fill: parent
+    visible: !!hangul.old
+    readonly property var marks: ({
+        "ㅈ": ["ᅎ", "ᅐ", ""], "ㅊ": ["ᅔ", "ᅕ", ""], "ㅅ": ["ᄼ", "ᄾ", "ㅿ"],
+        "ㄹ": ["", "", "ㅿ"], "ㅇ": ["", "", "ㆁ"], "ㅎ": ["", "", "ㆆ"], "ㅂ": ["", "", "ㅸ"],
+        "ㅁ": ["", "", "ㅱ"], "ㅍ": ["", "", "ㆄ"], "ㅏ": ["", "", "ㆍ"] })
+    readonly property var mk: marks[key ? key.text : ""] || ["", "", ""]
+    readonly property color ink: key && key.color ? key.color : "white"
+    Text { anchors.left: parent.left; anchors.leftMargin: 4; anchors.verticalCenter: parent.verticalCenter
+           text: m.mk[0]; color: m.ink; font.family: "Noto Sans KR"; font.pixelSize: 20 }
+    Text { anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
+           text: m.mk[1]; color: m.ink; font.family: "Noto Sans KR"; font.pixelSize: 20 }
+    Text { anchors.top: parent.top; anchors.topMargin: 2; anchors.horizontalCenter: parent.horizontalCenter
+           text: m.mk[2]; color: m.ink; font.family: "Noto Sans KR"; font.pixelSize: 20 }
+}
+)QML";
+
+void syncSwipeMarks() {
+    if (!g_state || !g_state->value(QStringLiteral("old")).toBool()) return;
+    QQuickItem *panel = findKeyboardPanel();
+    if (!panel) return;
+    QQmlEngine *eng = qmlEngine(panel);
+    if (!eng) return;
+    std::function<void(QQuickItem *, int)> walk = [&](QQuickItem *it, int depth) {
+        if (!it || depth > 40) return;
+        const QString text = it->property("text").toString();
+        if (text.size() == 1 && swipeTarget(text.at(0).unicode(), 'U') + swipeTarget(text.at(0).unicode(), 'L') > 0
+            && strstr(it->metaObject()->className(), "Text") && !it->property("_rmppMark").toBool()) {
+            it->setProperty("_rmppMark", true);
+            QQuickItem *cell = it->parentItem();          // the key: the first ancestor clearly wider than the letter
+            while (cell && cell->parentItem() && cell->width() < it->width() + 24) cell = cell->parentItem();
+            if (cell) {
+                auto *ctx = new QQmlContext(eng->rootContext(), cell);
+                ctx->setContextProperty(QStringLiteral("hangul"), g_state);
+                QQmlComponent comp(eng);
+                comp.setData(QByteArray(kMarkQml), QUrl(QStringLiteral("qrc:/hangul/SwipeMark.qml")));
+                QObject *o = comp.beginCreate(ctx);
+                if (auto *mark = qobject_cast<QQuickItem *>(o)) {
+                    mark->setProperty("key", QVariant::fromValue(it));
+                    mark->setParentItem(cell);
+                    mark->setParent(cell);
+                    comp.completeCreate();
+                } else {
+                    for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
+                    delete o;
+                }
+            }
+        }
+        for (QQuickItem *c : it->childItems()) walk(c, depth + 1);
+    };
+    walk(panel, 0);
+}
+
 // Research probe (off unless /tmp/rmpp-lang-touch exists): logs touch / mouse events on windows with the
 // deepest item under the point, and input-method commits, to learn when on-screen keys commit (press or release)
 // and whether swipes or long presses on keys can be seen (old Hangul by sliding a key).
@@ -753,6 +918,7 @@ protected:
 void init() {
     auto *app = QCoreApplication::instance();
     auto *filter = new HangulFilter(app);
+    g_hangul = filter;
     app->installEventFilter(filter);
     // Treat a Bluetooth/USB keyboard like the Type Folio: keys hidden, format bar kept.
     g_state = new QQmlPropertyMap(app);
@@ -766,6 +932,7 @@ void init() {
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("insert:")))
             insertOld(v.toString().mid(7).section(QLatin1Char('#'), 0, 0));
     });
+    app->installEventFilter(new SwipeFilter(app));
     auto *touch = new TouchProbe(app);
     app->installEventFilter(touch);
     auto *touchTimer = new QTimer(touch);
@@ -780,12 +947,13 @@ void init() {
             || g_state->value(QStringLiteral("label")).toString() != rmpplang::inputLabel()
             || g_state->value(QStringLiteral("enabled")).toBool() != (rmpplang::inputCycle().size() > 1)
             || g_state->value(QStringLiteral("old")).toBool()
-                   != (composesHangul() && rmpplang::inputChoice(rmpplang::currentInput()) == QLatin1String("old")))
+                   != (composesHangul() && rmpplang::oldLetters(rmpplang::currentInput())))
             applyInput("settings");
         syncExternalKeyboard();
         followScreenLanguage();
         syncIndicator();
         syncOldPalette();
+        syncSwipeMarks();
     });
     timer->start(1500);
     qWarning("[hangul] filter installed");
