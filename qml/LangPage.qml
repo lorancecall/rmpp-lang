@@ -13,6 +13,11 @@ Rectangle {
     readonly property var entries: {
         try { return JSON.parse(lang.languages || "[]"); } catch (e) { return []; }
     }
+    // List order: languages in use by priority (shared Han characters use the first one's font), then the rest.
+    readonly property var ordered: {
+        const on = entries.filter(e => e.enabled && e.priority >= 0).sort((a, b) => a.priority - b.priority);
+        return on.concat(entries.filter(e => !(e.enabled && e.priority >= 0)));
+    }
     property string current: ""          // language code whose page is open, "" = the list
     property bool picking: false         // font popup open
     readonly property var entry: {
@@ -79,18 +84,28 @@ Rectangle {
                 Layout.fillWidth: true
             }
             Repeater {
-                model: page.entries
+                model: page.ordered
                 delegate: ArkControls.Panel {
                     required property var modelData
                     label: modelData.code === "latin" || modelData.code === "en"
                            ? modelData.name : modelData.native + " · " + modelData.name
                     description: page.summary(modelData)
                     Layout.fillWidth: true
-                    action: ArkControls.Button {
-                        text: "›"
-                        type: ArkTokens.Button.secondary
-                        visible: modelData.code !== "en"
-                        onClicked: page.current = modelData.code
+                    action: Row {
+                        spacing: 16
+                        ArkControls.Button {      // raise priority
+                            text: "↑"
+                            type: ArkTokens.Button.secondary
+                            visible: !!modelData.enabled && !modelData.fixed && modelData.priority > 0
+                                     && page.ordered.some(o => o.enabled && !o.fixed && o.priority < modelData.priority)
+                            onClicked: page.send("up:" + modelData.code)
+                        }
+                        ArkControls.Button {
+                            text: "›"
+                            type: ArkTokens.Button.secondary
+                            visible: modelData.code !== "en"
+                            onClicked: page.current = modelData.code
+                        }
                     }
                     MouseArea {
                         anchors.fill: parent
@@ -99,6 +114,13 @@ Rectangle {
                         z: -1
                     }
                 }
+            }
+            ArkControls.Panel {
+                label: "Order"
+                description: "↑ moves a language up. Characters shared by languages (Chinese characters in Korean, "
+                             + "Japanese and Chinese) use the font of the first one."
+                Layout.fillWidth: true
+                Layout.topMargin: ArkControls.Values.spacing.large
             }
             ArkControls.Panel {
                 label: "Add a language or a font"
@@ -198,18 +220,6 @@ Rectangle {
                 elide: Text.ElideRight
                 Layout.fillWidth: true
                 Layout.leftMargin: 8
-            }
-            ArkControls.Panel {
-                visible: !!detail.e.enabled && !detail.e.fixed && detail.e.priority > 0
-                label: "Priority"
-                description: "Shared characters (Chinese characters in Korean, Japanese and Chinese) use the font of "
-                             + "the first language. This one is number " + (detail.e.priority + 1) + "."
-                Layout.fillWidth: true
-                action: ArkControls.Button {
-                    text: "Move up"
-                    type: ArkTokens.Button.secondary
-                    onClicked: page.send("up:" + detail.e.code)
-                }
             }
             ArkControls.Panel {
                 visible: !!detail.e.enabled

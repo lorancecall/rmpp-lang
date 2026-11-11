@@ -663,8 +663,11 @@ void command(const QString &cmd) {
         g_conf.insert(QStringLiteral("font.") + code, arg);
     } else if (verb == QLatin1String("up")) {     // raise priority (Han characters use the first CJK language)
         QStringList on = enabledCodes();
+        // Swap with the language above it; English has no font of its own and is skipped.
         const int i = on.indexOf(code);
-        if (i > 0) on.swapItemsAt(i, i - 1);
+        int j = i - 1;
+        while (j >= 0 && on.at(j) == QLatin1String("en")) --j;
+        if (i > 0 && j >= 0) on.move(i, j);
         g_conf.insert(QStringLiteral("languages"), on.join(','));
     } else {
         return;
