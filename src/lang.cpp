@@ -672,34 +672,6 @@ void probe() {
     QStringList out;
     out << QStringLiteral("time ") + QDateTime::currentDateTime().toString(Qt::ISODate);
     out << QStringLiteral("enabled ") + enabledCodes().join(',');
-    // Old Hangul as Qt alone draws it (no xochitl): /tmp/rmpp-lang-render.bmp, one line per font, to compare with
-    // a notebook (research: syllable tops painted over in notebooks).
-    {
-        const QString t = QString::fromUtf8("ᄆᆞᆯ ᄼᅡᆼ ᅀᅡ ᅐᅮᆼ 말 ᄆᆞᆯ〮");
-        QImage img(1400, 400, QImage::Format_RGB32);
-        img.fill(Qt::white);
-        QPainter pt(&img);
-        int y = 20;
-        for (const char *fam : {"Noto Sans KR", "reMarkable Sans"}) {
-            QFont f(QString::fromLatin1(fam));
-            f.setPixelSize(80);
-            QTextLayout tl(t, f);
-            tl.beginLayout();
-            QTextLine line = tl.createLine();
-            line.setLineWidth(1360);
-            tl.endLayout();
-            tl.draw(&pt, QPointF(20, y));
-            y += 180;
-        }
-        pt.end();
-        img.save(QStringLiteral("/tmp/rmpp-lang-render.bmp"), "BMP");
-    }
-    // Built-in on-screen layouts (format research: are extra entries of a key's list long-press choices?)
-    for (const char *loc : {"de_DE", "fr_FR", "pl_PL", "en_US"}) {
-        QFile lf(QStringLiteral(":/misc/keyboards/%1/keyboard_layout.json").arg(QLatin1String(loc)));
-        if (lf.open(QIODevice::ReadOnly))
-            QFile::copy(lf.fileName(), QStringLiteral("/tmp/rmpp-lang-layout-%1.json").arg(QLatin1String(loc)));
-    }
     for (QChar::Script s : {QChar::Script_Latin, QChar::Script_Hangul, QChar::Script_Han, QChar::Script_Hiragana})
         out << QStringLiteral("fallback script %1: %2").arg(int(s)).arg(QFontDatabase::applicationFallbackFontFamilies(s).join(" | "));
     out << QStringLiteral("app font default: ") + QGuiApplication::font().family();
