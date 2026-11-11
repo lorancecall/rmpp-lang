@@ -171,14 +171,46 @@ bool hasConjoining(const QString &s) {
     }
     return false;
 }
+bool g_selfSend = false;            // our own re-commit (redraw): the composer ignores it
+
+// Strategy (research; /tmp/rmpp-lang-redraw holds 1, 2 or 3, default 2):
+//   1 = update() on the item and window; 2 = commit the word before the cursor again, unchanged;
+//   3 = commit the paragraph up to the cursor again, unchanged.
+int redrawStrategy() {
+    QFile f(QStringLiteral("/tmp/rmpp-lang-redraw"));
+    if (!f.open(QIODevice::ReadOnly)) return 2;
+    const int v = f.readAll().trimmed().toInt();
+    return v >= 1 && v <= 3 ? v : 2;
+}
+
 void redrawLater(QObject *obj, const QString &before, const QString &after) {
     if (!hasConjoining(before) && !hasConjoining(after)) return;
     QPointer<QObject> o(obj);
-    QTimer::singleShot(60, [o] {
-        auto *item = qobject_cast<QQuickItem *>(o.data());
+    QTimer::singleShot(0, [o] {
+        QObject *t = o.data();
+        auto *item = qobject_cast<QQuickItem *>(t);
         if (!item) return;
-        item->update();
-        if (item->window()) item->window()->update();
+        const int how = redrawStrategy();
+        if (how == 1) {
+            item->update();
+            if (item->window()) item->window()->update();
+            return;
+        }
+        QInputMethodQueryEvent q(Qt::ImSurroundingText | Qt::ImCursorPosition);
+        QCoreApplication::sendEvent(t, &q);
+        const QString text = q.value(Qt::ImSurroundingText).toString();
+        const int cur = q.value(Qt::ImCursorPosition).toInt();
+        if (cur <= 0 || cur > text.size()) return;
+        int from = cur;
+        if (how == 2) while (from > 0 && !text.at(from - 1).isSpace()) --from;
+        else from = 0;
+        const QString span = text.mid(from, cur - from);
+        if (span.isEmpty()) return;
+        QInputMethodEvent im;
+        im.setCommitString(span, -span.size(), span.size());
+        g_selfSend = true;
+        QCoreApplication::sendEvent(t, &im);
+        g_selfSend = false;
     });
 }
 
@@ -270,7 +302,7 @@ private:
     }
 
     bool onInputMethod(QObject *obj, QInputMethodEvent *e) {
-        if (ownSend) return false;
+        if (ownSend || g_selfSend) return false;
         if (e == lastEvent && e->commitString() == lastSet) return false;  // re-delivered
         if (obj != QGuiApplication::focusObject()) return false;
         QString commit = e->commitString();
@@ -776,6 +808,8 @@ constexpr qreal kSwipe = 40;
 struct SwipeTarget { char16_t key, left, right, up; };
 const SwipeTarget SWIPES[] = {
     {u'ㅈ', 0x114E, 0x1150, 0}, {u'ㅊ', 0x1154, 0x1155, 0}, {u'ㅅ', 0x113C, 0x113E, u'ㅿ'},
+    // xochitl types a key's Shift letter when the key is swiped (seen on 3.29: ㅅ swiped -> ㅆ)
+    {u'ㅉ', 0x114E, 0x1150, 0}, {u'ㅆ', 0x113C, 0x113E, u'ㅿ'}, {u'ㅃ', 0, 0, u'ㅸ'},
     {u'ㄹ', 0, 0, u'ㅿ'}, {u'ㅇ', 0, 0, u'ㆁ'}, {u'ㅎ', 0, 0, u'ㆆ'}, {u'ㅂ', 0, 0, u'ㅸ'},
     {u'ㅁ', 0, 0, u'ㅱ'}, {u'ㅍ', 0, 0, u'ㆄ'}, {u'ㅏ', 0, 0, u'ㆍ'},
 };
@@ -840,7 +874,7 @@ protected:
     }
 };
 
-// Small arrows on the keys that can be swiped, toward each direction that works (◂ ▸ ▴), while old letters are
+// Small bars on the edges of the keys that can be swiped, on each side that works, while old letters are
 // on. xochitl's VirtualKeyboard paints its keys itself (one QQuickPaintedItem, no item per key), so the arrows sit
 // in a layer over it at the key positions of the ko_KR layout, measured on the tablet (1620 px wide keyboard:
 // row 1 starts at x 156, rows 2 and 3 at 231 / 372, one key every ~144.5 px; rows at y 85, 205, 331).
@@ -860,17 +894,20 @@ Item {
         [0, 0, 0, 0, 1], [1, 0, 0, 0, 1], [2, 2, 1, 1, 0], [2, 3, 0, 0, 1], [1, 7, 0, 0, 1] ]
     readonly property var x0: [156, 231, 372]
     readonly property var ys: [85, 205, 331]
+    // Key cell: ~144 px wide, ~120 px tall; bars sit on its edges like grooves (developer: "막대 홈"), gray.
+    readonly property real kw: 132 * s
+    readonly property real kh: 104 * s
     Repeater {
         model: m.keys
         Item {
             readonly property real cx: (m.x0[modelData[0]] + 144.5 * modelData[1]) * m.s
             readonly property real cy: m.ys[modelData[0]] * m.s
-            Text { visible: modelData[2] === 1; text: "◂"; color: "white"; font.pixelSize: 16
-                   x: parent.cx - 44 * m.s - width / 2; y: parent.cy - height / 2 }
-            Text { visible: modelData[3] === 1; text: "▸"; color: "white"; font.pixelSize: 16
-                   x: parent.cx + 44 * m.s - width / 2; y: parent.cy - height / 2 }
-            Text { visible: modelData[4] === 1; text: "▴"; color: "white"; font.pixelSize: 16
-                   x: parent.cx - width / 2; y: parent.cy - 36 * m.s - height / 2 }
+            Rectangle { visible: modelData[2] === 1; color: "#909090"; radius: 1.5
+                        width: 3; height: 22 * m.s; x: parent.cx - m.kw / 2; y: parent.cy - height / 2 }
+            Rectangle { visible: modelData[3] === 1; color: "#909090"; radius: 1.5
+                        width: 3; height: 22 * m.s; x: parent.cx + m.kw / 2 - width; y: parent.cy - height / 2 }
+            Rectangle { visible: modelData[4] === 1; color: "#909090"; radius: 1.5
+                        width: 22 * m.s; height: 3; x: parent.cx - width / 2; y: parent.cy - m.kh / 2 }
         }
     }
 }
