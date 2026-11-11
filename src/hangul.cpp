@@ -619,8 +619,8 @@ Item {
                             width: 84; height: 76; radius: 8; color: "white"
                             Text {
                                 anchors.centerIn: parent
-                                // 방점 shown on a dotted circle, initials on their own
-                                text: (modelData === "\u302E" || modelData === "\u302F") ? "\u25CC" + modelData : modelData
+                                // the font draws a lone 방점 on its own dotted circle
+                                text: modelData
                                 color: "black"
                                 font.family: "Noto Sans KR"; font.pixelSize: 40
                             }
