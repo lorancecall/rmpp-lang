@@ -270,7 +270,7 @@ QString buttonLabel(const QString &kind) {
 
 // ---- state shared with the QML on the format bar ----
 
-QQmlPropertyMap *g_map = nullptr;   // available, label, open, cands (JSON), page, perPage; command written by QML
+QQmlPropertyMap *g_map = nullptr;   // available, label, open, cands (JSON), page, pageStart/Size/Total; command written by QML
 QPointer<QObject> g_target;         // the text field the candidates are for
 struct Cand { QString hanja, meaning; int len; };
 QList<Cand> g_cands;
@@ -384,10 +384,12 @@ void pick(int i) {
     QCoreApplication::sendEvent(obj, &im);
 }
 
-int perPage() { return qMax(1, g_map->value(QStringLiteral("perPage")).toInt()); }
+// The QML lays candidates out by their width and reports the current page: first index, size, number of pages.
+int pageStart() { return g_map->value(QStringLiteral("pageStart")).toInt(); }
+int pageSize() { return qMax(1, g_map->value(QStringLiteral("pageSize")).toInt()); }
 
 void turnPage(int delta) {
-    const int pages = (int(g_cands.size()) + perPage() - 1) / perPage();
+    const int pages = qMax(1, g_map->value(QStringLiteral("pageTotal")).toInt());
     const int p = g_map->value(QStringLiteral("page")).toInt() + delta;
     if (p >= 0 && p < pages) g_map->insert(QStringLiteral("page"), p);
 }
@@ -410,8 +412,7 @@ protected:
         if (g_cands.isEmpty()) return false;
         const int key = k->key();
         if (key >= Qt::Key_1 && key <= Qt::Key_9 && k->modifiers() == Qt::NoModifier) {
-            const int i = g_map->value(QStringLiteral("page")).toInt() * perPage() + (key - Qt::Key_1);
-            if (key - Qt::Key_1 < perPage()) pick(i);
+            if (key - Qt::Key_1 < pageSize()) pick(pageStart() + (key - Qt::Key_1));
             return true;
         }
         if (key == Qt::Key_Right || key == Qt::Key_Space || key == Qt::Key_Tab) { turnPage(1); return true; }
@@ -432,9 +433,26 @@ Item {
     anchors.fill: parent
     z: 6
     readonly property var cands: hanja.open ? JSON.parse(hanja.cands || "[]") : []
-    readonly property int per: Math.max(3, Math.floor((width - 320) / 150))
-    onPerChanged: hanja.perPage = per
-    Component.onCompleted: hanja.perPage = per
+    // Cells as wide as their word (食べます, 中国人), pages filled greedily to the room on the bar.
+    FontMetrics { id: fm; font.pixelSize: 32 }
+    function cellWidth(c) { return Math.min(420, Math.max(144, Math.ceil(fm.advanceWidth(c.h)) + 32)); }
+    readonly property real room: Math.max(300, width - 200 - 76 - 12 - 16 - 2 * (56 + 6))
+    readonly property var pages: {
+        const out = [0];
+        let used = 0;
+        for (let i = 0; i < cands.length; ++i) {
+            const w = cellWidth(cands[i]) + 6;
+            if (used > 0 && (used + w > room || i - out[out.length - 1] >= 9)) { out.push(i); used = 0; }
+            used += w;
+        }
+        return out;
+    }
+    readonly property int first: pages[Math.min(hanja.page, pages.length - 1)] || 0
+    readonly property int last: hanja.page + 1 < pages.length ? pages[hanja.page + 1] : cands.length
+    function report() { hanja.pageStart = first; hanja.pageSize = last - first; hanja.pageTotal = pages.length; }
+    onFirstChanged: report()
+    onLastChanged: report()
+    onPagesChanged: report()
 
     Rectangle {
         id: button
@@ -474,9 +492,9 @@ Item {
                 MouseArea { anchors.fill: parent; onClicked: hanja.command = "page:-1#" + Date.now() }
             }
             Repeater {
-                model: root.cands.slice(hanja.page * root.per, (hanja.page + 1) * root.per)
+                model: root.cands.slice(root.first, root.last)
                 Rectangle {
-                    width: 144; height: 64; radius: 8; color: "white"
+                    width: root.cellWidth(modelData); height: 64; radius: 8; color: "white"
                     Text {
                         x: 6; y: 2
                         text: String(index + 1)
@@ -501,13 +519,13 @@ Item {
                     }
                     MouseArea {
                         anchors.fill: parent
-                        onClicked: hanja.command = "pick:" + (hanja.page * root.per + index) + "#" + Date.now()
+                        onClicked: hanja.command = "pick:" + (root.first + index) + "#" + Date.now()
                     }
                 }
             }
             Rectangle {
                 width: 56; height: 64; radius: 8; color: "black"; border.color: "white"; border.width: 2
-                opacity: (hanja.page + 1) * root.per < root.cands.length ? 1 : 0.3
+                opacity: hanja.page + 1 < root.pages.length ? 1 : 0.3
                 Text { anchors.centerIn: parent; text: "›"; color: "white"; font.pixelSize: 40 }
                 MouseArea { anchors.fill: parent; onClicked: hanja.command = "page:1#" + Date.now() }
             }
@@ -571,7 +589,9 @@ void rmpplang::hanjaInit() {
     g_map->insert(QStringLiteral("open"), false);
     g_map->insert(QStringLiteral("cands"), QStringLiteral("[]"));
     g_map->insert(QStringLiteral("page"), 0);
-    g_map->insert(QStringLiteral("perPage"), 6);
+    g_map->insert(QStringLiteral("pageStart"), 0);
+    g_map->insert(QStringLiteral("pageSize"), 6);
+    g_map->insert(QStringLiteral("pageTotal"), 1);
     g_map->insert(QStringLiteral("command"), QString());
     QObject::connect(g_map, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
         if (key == QLatin1String("command")) onCommand(v.toString());
