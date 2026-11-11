@@ -235,6 +235,8 @@ default=0                  # 1 = preselected in the installer menu
 label=                     # indicator text on the format bar ("" = the code in capitals; ko: 한)
 keyboard_name=ЙЦУКЕН       # how Settings names the layout ("" = the layout ids)
 sample=Здравствуйте, хорошего дня · 123   # Settings sample line in the chosen font
+sample_plain=              # shown instead for fonts that cannot render `sample` (missing glyphs, uncomposed old
+                           # Hangul jamo); ko: Hunminjeongeum in old Hangul, plain = the same line in modern Korean
 ```
 
 Script names: `Latin Greek Cyrillic Armenian Hebrew Arabic Devanagari Bengali Thai Lao Georgian Hangul Hiragana
