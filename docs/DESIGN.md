@@ -56,7 +56,7 @@ latin.replaces=reMarkable Sans   # which of xochitl's document families font.lat
   "languages": [
     { "code": "ko", "name": "Korean", "native": "한국어", "enabled": true, "priority": 0,
       "keyboard": true, "font": "NanumMyeongjo",
-      "families": ["NanumMyeongjo", "Noto Sans CJK KR", "Noto Sans KR"],
+      "families": ["NanumMyeongjo", "Noto Sans KR"],
       "files": [{ "path": "/home/root/.local/share/fonts/rmpp-lang/ko/NanumMyeongjo-Regular.ttf",
                   "families": ["NanumMyeongjo"] }] } ] }
 ```
@@ -75,7 +75,7 @@ Convert to ink) draw with it and offer no font choice of their own.
 ```json
 { "version": 1,
   "languages": {
-    "ko":    { "family": "Noto Sans CJK KR", "file": "/home/root/.local/share/rmpp-lang/languages/ko/fonts/NotoSansCJKkr-Regular.otf", "chosen": "" },
+    "ko":    { "family": "Noto Sans KR", "file": "/usr/share/fonts/ttf/noto/NotoSansKR-VariableFont_wght.ttf", "chosen": "" },
     "ja":    { "family": "Noto Sans JP", "file": "/usr/share/fonts/ttf/noto/NotoSansJP-VariableFont_wght.ttf", "chosen": "" },
     "en":    { "family": "Noto Sans", "file": "/usr/share/fonts/ttf/noto/NotoSans-VariableFont_wdth,wght.ttf", "chosen": "" },
     "latin": { "family": "Noto Sans", "file": "/usr/share/fonts/ttf/noto/NotoSans-VariableFont_wdth,wght.ttf", "chosen": "" } } }

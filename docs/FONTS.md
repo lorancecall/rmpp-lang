@@ -38,7 +38,7 @@ choose it later in Settings.
 ```sh
 rmpp-lang font add /home/root/MyFont-Regular.ttf --lang ko --use
 rmpp-lang font list
-rmpp-lang font use "Noto Sans CJK KR" --lang ko     # pick an installed family; "" = back to the default
+rmpp-lang font use "NanumMyeongjo" --lang ko       # pick an installed family; "" = back to the default
 rmpp-lang font rm MyFont-Regular.ttf --lang ko
 ```
 
