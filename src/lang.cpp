@@ -717,13 +717,19 @@ void tryInject() {
         ctx->setContextProperty(QStringLiteral("payloadLoaderRef"), loader);
         QQuickItem *row = createFrom(eng, ctx, "qrc:/rmpplang/qml/LangSidebarItem.qml", col);
         if (row) {
-            // Right after xochitl's own language row if it can be found, else at the end.
+            // In the rail right above Handwriting (rmpp-hwr), else above Cloud, else above Help. The column ends in
+            // a filler, so a row left at the end shows at the bottom of the screen. Other add-ons inject later:
+            // look again a few times.
             auto place = [col, row] {
+                QQuickItem *hwr = nullptr, *cloud = nullptr, *help = nullptr;
                 for (QQuickItem *k : col->childItems()) {
                     if (k == row) continue;
-                    const QString t = k->property("text").toString() + k->property("iconSource").toString();
-                    if (t.contains(QLatin1String("anguage"))) { row->stackAfter(k); break; }
+                    const QString icon = k->property("iconSource").toString();
+                    if (k->objectName() == QLatin1String("rmppHwrSidebarItem")) hwr = k;
+                    else if (icon.endsWith(QLatin1String("/cloud"))) cloud = k;
+                    else if (icon.contains(QLatin1String("question_circle"))) help = k;
                 }
+                if (QQuickItem *before = hwr ? hwr : cloud ? cloud : help) row->stackBefore(before);
             };
             place();
             for (int ms : {1500, 4000}) QTimer::singleShot(ms, row, place);

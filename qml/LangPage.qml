@@ -19,9 +19,10 @@ Rectangle {
         for (let i = 0; i < entries.length; ++i) if (entries[i].code === current) return entries[i];
         return null;
     }
-    // Sample line per language: everyday words plus the characters that differ most between fonts.
+    // Sample line per language. Korean: the opening of Hunminjeongeum (old Hangul jamo + Hanja; shows whether a font
+    // composes old Hangul).
     readonly property var samples: ({
-        "ko": "안녕하세요, 오늘도 좋은 하루 되세요 · 韓國語 123",
+        "ko": "나랏말ᄊᆞ미 듕귁에 달아 · 國之語音 異乎中國",
         "ja": "こんにちは、今日もよい一日を · 日本語 123",
         "zh": "你好，祝你今天愉快 · 中文 漢字 123",
         "ru": "Здравствуйте, хорошего дня · 123",
