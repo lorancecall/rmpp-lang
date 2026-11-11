@@ -372,8 +372,9 @@ QPair<QString, QString> fontFileFor(const QString &family) {
 void writeFontsJson() {
     QJsonObject langs;
     for (const Lang &l : g_langs) {
-        const QString chosen = fontOf(l.code);
-        const QString family = chosen.isEmpty() ? deviceDefault(l) : chosen;
+        const QString used = fontOf(l.code);                                   // user's choice, else the add-on's default
+        const QString chosen = confValue(QStringLiteral("font.") + l.code);    // the user's choice only
+        const QString family = used.isEmpty() ? deviceDefault(l) : used;
         const auto ff = fontFileFor(family);
         langs.insert(l.code, QJsonObject{{"family", ff.second.isEmpty() ? family : ff.second},
                                          {"file", ff.first}, {"chosen", chosen}});
