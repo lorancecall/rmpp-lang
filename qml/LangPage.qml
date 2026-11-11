@@ -19,12 +19,13 @@ Rectangle {
         for (let i = 0; i < entries.length; ++i) if (entries[i].code === current) return entries[i];
         return null;
     }
+    // Sample line per language: everyday words plus the characters that differ most between fonts.
     readonly property var samples: ({
-        "ko": "다람쥐 헌 쳇바퀴에 타고파 · 漢字",
-        "ja": "いろはにほへと ちりぬるを · 漢字",
-        "zh": "天地玄黄 宇宙洪荒 · 汉字",
-        "ru": "Съешь же ещё этих мягких французских булок",
-        "latin": "The quick brown fox jumps over the lazy dog"
+        "ko": "안녕하세요, 오늘도 좋은 하루 되세요 · 韓國語 123",
+        "ja": "こんにちは、今日もよい一日を · 日本語 123",
+        "zh": "你好，祝你今天愉快 · 中文 漢字 123",
+        "ru": "Здравствуйте, хорошего дня · 123",
+        "latin": "Hello, have a nice day · Aa Gg Rr 123"
     })
 
     function send(cmd) { lang.command = cmd + "#" + Date.now(); }
