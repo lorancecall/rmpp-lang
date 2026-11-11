@@ -49,6 +49,8 @@ installer again (or `vellum reenable`).
   ㅃ ㅉ ㄸ ㄲ ㅆ ㅒ ㅖ.
 - **Type Folio, Bluetooth and USB keyboards:** **Ctrl+Space** or **right Alt / right Cmd** cycles through English
   and the languages with a keyboard, in Settings order. The on-screen keyboard follows.
+- **Hanja (Korean):** tap **漢** on the format bar, or press the Hanja key or **F9**, to turn the Hangul before
+  the cursor (or the selected word) into Hanja: pick from the candidates (1-9 on a physical keyboard).
 - **Indicator:** a button on the format bar above the keyboard shows the current language (EN, 한, RU, ...); tap
   it to switch.
 - **External keyboards:** while a Bluetooth or USB keyboard is connected, the on-screen keys fold away and the
@@ -111,4 +113,6 @@ rmpp-lang grew out of rmpp-korean 0.1.0 (Korean keyboard and fonts). There is no
 
 ## License
 
-GPL-3.0-only. See [LICENSE](LICENSE). Fonts you add keep their own licenses.
+GPL-3.0-only. See [LICENSE](LICENSE). Fonts you add keep their own licenses. The Hanja dictionary
+(`languages/ko/dict/hanja.txt`) comes from [libhangul](https://github.com/libhangul/libhangul) under the
+BSD-3-Clause license in its header.

@@ -68,6 +68,7 @@ struct Lang {
     QString code, name, native, input, defaultFont, dir;   // input: layout | compose:<name> | none
     QString label, keyboardName, sample, samplePlain;     // indicator text, layout name, Settings sample line
                                                           // (+ the line for fonts that cannot render it)
+    QString convert, convertDict;                         // conversion kind (hanja) and its dictionary file
     QList<QChar::Script> scripts;
     QStringList layouts, known;                           // on-screen layout ids; device families worth offering
     bool han = false, rtl = false, builtin = false;
@@ -163,6 +164,8 @@ void loadLanguages() {
         l.keyboardName = kv.value("keyboard_name");
         l.sample = kv.value("sample");
         l.samplePlain = kv.value("sample_plain");
+        l.convert = kv.value("convert");
+        l.convertDict = kv.value("convert_dict");
         if (!l.defaultFont.isEmpty()) l.known << l.defaultFont;
         for (const QString &f : kv.value("families").split(',', Qt::SkipEmptyParts))
             if (!l.known.contains(f.trimmed())) l.known << f.trimmed();
@@ -459,6 +462,17 @@ QString docFamily(const QString &family, void *ret) {
 } // namespace
 
 // ---- public ----
+
+QString convertKind(const QString &code) {
+    const Lang *l = findLang(code);
+    return l && !l->convertDict.isEmpty() ? l->convert : QString();
+}
+
+QString convertDict(const QString &code) {
+    const Lang *l = findLang(code);
+    if (!l || l->convertDict.isEmpty() || l->convertDict.contains(QLatin1String(".."))) return {};
+    return l->dir + QLatin1Char('/') + l->convertDict;
+}
 
 bool languageEnabled(const QString &code) { return findLang(code) && enabledCodes().contains(code); }
 bool keyboardEnabled(const QString &code) {
@@ -942,6 +956,7 @@ void init() {
     auto *keys = new KeymapFilter(app);
     app->installEventFilter(keys);
     hangulInit();             // installed after: sees events first, handles Korean and the language toggle
+    hanjaInit();              // after Hangul: the Hanja key and candidate keys come first
     auto *t = new QTimer(app);
     QObject::connect(t, &QTimer::timeout, app, [] { poll(); });
     t->start(1500);

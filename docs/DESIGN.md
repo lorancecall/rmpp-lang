@@ -164,8 +164,28 @@ Adding a keyboard:
   `input=compose:<name>`.
 - **Conversion IMEs** (Japanese kana-kanji, Chinese pinyin): need a candidate bar and a dictionary
   (e.g. libkkc/mozc-style data, libpinyin/rime). Out of scope for now; fonts come first.
+- **Conversion in a composing language** (Korean Hangul -> Hanja): the add-on's `convert=` and dictionary,
+  the candidate bar of the core (`hanja.cpp`); see "Hanja conversion" below.
 - **Right-to-left** (Hebrew, Arabic): layout is easy, but xochitl's text editing and cursor movement must be
   checked with bidirectional text first.
+
+### Hanja conversion
+
+- **Trigger**: the 漢 button on the keyboard's format bar (left of the language indicator, shown while the input
+  language has `convert=hanja`), or the Hanja key / F9 of a physical keyboard.
+- **What is converted**: the selection if there is one (a word of up to 8 syllables), else the Hangul syllables
+  right before the cursor: candidates for the longest run first (한국어 -> 韓國語), then shorter ones down to the
+  last syllable (語 for 어), as in the usual Korean IMEs. Text comes from the field's
+  `ImSurroundingText` / `ImCursorPosition` (the Hangul engine already relies on them).
+- **Candidate bar**: over the format bar, Hanja with its meaning ("옳을 가"), numbered; ‹ › page. Physical keys
+  while it is open: 1-9 pick, Left/Right/Space/Tab page, Esc closes, any other key closes it and types.
+- **Replacement**: an input-method commit replacing the syllables before the cursor (`setCommitString(hanja,
+  -len, len)`) or the selection; the Hangul engine sees a non-jamo commit and ends its syllable.
+- **Dictionary**: `languages/ko/dict/hanja.txt` from libhangul's `data/hanja/hanja.txt` (BSD-3-Clause, header
+  kept), rebuilt with `tools/hanja-dict.py`: `reading:hanja:meaning`, sorted by the reading's UTF-8 bytes; within a
+  reading, entries with a meaning first (韓國 before 寒國). 303k entries, 6.4 MB; the core memory-maps it and
+  binary-searches, so xochitl's memory does not grow.
+- **Later**: learn the user's picks (move them first), Hanja -> Hangul back, the same bar for ja/zh IMEs.
 
 ### Next keyboards
 
@@ -237,6 +257,8 @@ keyboard_name=ЙЦУКЕН       # how Settings names the layout ("" = the layou
 sample=Здравствуйте, хорошего дня · 123   # Settings sample line in the chosen font
 sample_plain=              # shown instead for fonts that cannot render `sample` (missing glyphs, uncomposed old
                            # Hangul jamo); ko: Hunminjeongeum in old Hangul, plain = the same line in modern Korean
+convert=                   # conversion offered by the core: hanja ("" = none); ko: hanja
+convert_dict=              # its dictionary, relative to the add-on folder; ko: dict/hanja.txt
 ```
 
 Script names: `Latin Greek Cyrillic Armenian Hebrew Arabic Devanagari Bengali Thai Lao Georgian Hangul Hiragana

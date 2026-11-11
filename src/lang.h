@@ -23,4 +23,9 @@ QString inputForScreenLayout(const QString &layout);
 // Hangul composition (hangul.cpp), used by add-ons with input=compose:hangul: started once at startup.
 void hangulInit();
 
+// Conversion (hanja.cpp): an add-on's convert= kind ("hanja", "" = none) and the absolute path of its convert_dict.
+QString convertKind(const QString &code);
+QString convertDict(const QString &code);
+void hanjaInit();
+
 } // namespace rmpplang
