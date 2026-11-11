@@ -209,7 +209,9 @@ languages/<code>/
 ```
 
 `<code>`: lowercase ISO 639-1 (`ja`, `zh`, `ru`, `uk`, `tr`, `vi`, `he`, ...), a region suffix only when needed
-(`zh-hant`). Reserved for the core: `en`, `latin`.
+(`zh-hant`). Reserved for the core: `en`, `latin`. The code set is shared with rmpp-hwr and the rmpp-hwr-db dataset:
+ISO 639-1 plus the variants listed in rmpp-hwr-db `scripts/languages.py` (`VARIANTS`, now `zh-hant`); a new
+variant is added there first.
 
 `language.conf` (key=value, `#` comments, UTF-8; read by the core, the package build and the installer):
 

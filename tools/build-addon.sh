@@ -10,6 +10,9 @@ for code in "$@"; do
   src=languages/$code
   [ -f "$src/language.conf" ] || { echo "no $src/language.conf" >&2; exit 1; }
   grep -q "^code=$code\$" "$src/language.conf" || { echo "$src/language.conf: code is not $code" >&2; exit 1; }
+  # Shared code set (rmpp-hwr-db scripts/languages.py): ISO 639-1, or a listed variant such as zh-hant.
+  case "$code" in en|latin) echo "$code is reserved for the core" >&2; exit 1 ;; esac
+  echo "$code" | grep -Eq '^[a-z]{2}(-[a-z]{2,8})?$' || { echo "$code: not an ISO 639-1 code (or variant)" >&2; exit 1; }
   out=build/languages/$code
   rm -rf "$out" "build/languages/$code.rcc"
   mkdir -p "$out"
