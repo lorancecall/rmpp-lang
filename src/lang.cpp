@@ -19,6 +19,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QPointer>
 #include <QtCore/QResource>
 #include <QtCore/QSaveFile>
 #include <QtCore/QSet>
@@ -661,13 +662,14 @@ void command(const QString &cmd) {
         g_conf.insert(QStringLiteral("keyboard.") + code, arg == QLatin1String("1") ? QStringLiteral("1") : QStringLiteral("0"));
     } else if (verb == QLatin1String("font")) {
         g_conf.insert(QStringLiteral("font.") + code, arg);
-    } else if (verb == QLatin1String("up")) {     // raise priority (Han characters use the first CJK language)
+    } else if (verb == QLatin1String("up") || verb == QLatin1String("down")) {
+        // Move one place among the languages in use; English has no font of its own and is skipped.
         QStringList on = enabledCodes();
-        // Swap with the language above it; English has no font of its own and is skipped.
         const int i = on.indexOf(code);
-        int j = i - 1;
-        while (j >= 0 && on.at(j) == QLatin1String("en")) --j;
-        if (i > 0 && j >= 0) on.move(i, j);
+        const int step = verb == QLatin1String("up") ? -1 : 1;
+        int j = i + step;
+        while (j >= 0 && j < on.size() && on.at(j) == QLatin1String("en")) j += step;
+        if (i >= 0 && j >= 0 && j < on.size()) on.move(i, j);
         g_conf.insert(QStringLiteral("languages"), on.join(','));
     } else {
         return;
@@ -698,6 +700,65 @@ QQuickItem *createFrom(QQmlEngine *eng, QQmlContext *ctx, const char *url, QQuic
     return item;
 }
 
+// ---- Settings rail order shared by the rmpp add-ons ----
+// Every rmpp row carries an int property "rmppOrder" and goes after xochitl's Wi-Fi row, sorted by it:
+//   rmpp-bt 100 (Bluetooth), rmpp-tailscale 200, rmpp-lang 300 (Languages), rmpp-hwr 400 (Handwriting).
+// Rows of add-ons that do not set the property yet are recognised by class / objectName. Each add-on places only
+// its own row: after the rmpp row with the highest order below its own, else after Wi-Fi. So the final order is
+// the same whichever add-on injects first.
+const int kRailOrder = 300;
+QList<QPair<QPointer<QQuickItem>, QPointer<QQuickItem>>> g_rails;   // (settingsColumn, our row)
+
+int railOrder(QQuickItem *k) {
+    const QVariant v = k->property("rmppOrder");
+    if (v.isValid()) return v.toInt();
+    const char *cls = k->metaObject()->className();
+    if (qstrncmp(cls, "BtSidebarItem", 13) == 0) return 100;
+    if (qstrncmp(cls, "TsSidebarItem", 13) == 0) return 200;
+    if (k->objectName() == QLatin1String("rmppHwrSidebarItem")) return 400;
+    return -1;
+}
+
+void placeRow(QQuickItem *col, QQuickItem *row) {
+    const int mine = railOrder(row);
+    QQuickItem *after = nullptr, *wifi = nullptr;
+    int best = -1;
+    for (QQuickItem *k : col->childItems()) {
+        if (k == row) continue;
+        if (k->property("iconSource").toString().contains(QLatin1String("/wifi"))) wifi = k;
+        const int o = railOrder(k);
+        if (o >= 0 && o < mine && o > best) { best = o; after = k; }
+    }
+    if (!after) after = wifi;
+    if (!after) return;
+    // Already right after it? (stackAfter on every childrenChanged would loop.)
+    const auto kids = col->childItems();
+    const int ia = kids.indexOf(after), ir = kids.indexOf(row);
+    if (ir != ia + 1) {
+        row->stackAfter(after);
+        qWarning("[rmpp-lang] rail: Languages placed after %s", qPrintable(after->property("text").toString()));
+    }
+}
+
+void tryInject();
+
+// Inject as soon as the Settings page exists, before its first frame is drawn (afterAnimating runs on the GUI
+// thread before every frame), so the row is there from the start instead of popping in on the next poll.
+void watchWindows() {
+    for (QWindow *w : QGuiApplication::allWindows()) {
+        auto *qw = qobject_cast<QQuickWindow *>(w);
+        if (!qw || qw->property("_rmpplangWatch").toBool()) continue;
+        qw->setProperty("_rmpplangWatch", true);
+        QObject::connect(qw, &QQuickWindow::afterAnimating, qw, [] {
+            tryInject();
+            for (int i = g_rails.size() - 1; i >= 0; --i) {
+                if (!g_rails[i].first || !g_rails[i].second) g_rails.removeAt(i);
+                else placeRow(g_rails[i].first, g_rails[i].second);
+            }
+        });
+    }
+}
+
 void tryInject() {
     for (QWindow *w : QGuiApplication::allWindows()) {
         auto *qw = qobject_cast<QQuickWindow *>(w);
@@ -720,22 +781,11 @@ void tryInject() {
         ctx->setContextProperty(QStringLiteral("payloadLoaderRef"), loader);
         QQuickItem *row = createFrom(eng, ctx, "qrc:/rmpplang/qml/LangSidebarItem.qml", col);
         if (row) {
-            // In the rail right above Handwriting (rmpp-hwr), else above Cloud, else above Help. The column ends in
-            // a filler, so a row left at the end shows at the bottom of the screen. Other add-ons inject later:
-            // look again a few times.
-            auto place = [col, row] {
-                QQuickItem *hwr = nullptr, *cloud = nullptr, *help = nullptr;
-                for (QQuickItem *k : col->childItems()) {
-                    if (k == row) continue;
-                    const QString icon = k->property("iconSource").toString();
-                    if (k->objectName() == QLatin1String("rmppHwrSidebarItem")) hwr = k;
-                    else if (icon.endsWith(QLatin1String("/cloud"))) cloud = k;
-                    else if (icon.contains(QLatin1String("question_circle"))) help = k;
-                }
-                if (QQuickItem *before = hwr ? hwr : cloud ? cloud : help) row->stackBefore(before);
-            };
-            place();
-            for (int ms : {1500, 4000}) QTimer::singleShot(ms, row, place);
+            row->setProperty("rmppOrder", kRailOrder);
+            placeRow(col, row);
+            // Rows of other add-ons arrive in later frames: checked again before every frame (afterAnimating),
+            // so the order is right before anything is drawn and nothing moves afterwards.
+            g_rails.append({QPointer<QQuickItem>(col), QPointer<QQuickItem>(row)});
         }
         QQuickItem *page = createFrom(eng, ctx, "qrc:/rmpplang/qml/LangPage.qml", settings);
         qWarning("[rmpp-lang] injected into Settings: row=%s page=%s", row ? "ok" : "FAILED", page ? "ok" : "FAILED");
@@ -762,6 +812,7 @@ void poll() {
         QFile::remove(kProbeReq);
         probe();
     }
+    watchWindows();
     tryInject();
 }
 

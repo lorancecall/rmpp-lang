@@ -252,7 +252,8 @@ license. Files: the folder minus `keyboards/` and `fonts.conf`, plus downloaded 
 
 A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tailscale 1002).
 
-- **List**: one row per installed language (Korean, English, typed text, then the add-ons) with a one-line
+- **List**: the languages in use in their order (▲ ▼: the order keyboards switch in; the same order decides
+  which font draws Han characters shared by ko/ja/zh), then the others; one row per installed language (Korean, English, typed text, then the add-ons) with a one-line
   summary ("Keyboard on · Font: NanumMyeongjo"). Tapping a row opens its page.
 - **Language page**: on/off, keyboard (with where to turn on the on-screen layout), font, a sample line in that
   font, priority ("Move up": shared Han characters use the first language's font), the folder for the user's fonts.

@@ -35,6 +35,12 @@ Rectangle {
     })
 
     function send(cmd) { lang.command = cmd + "#" + Date.now(); }
+    // Languages in use that have their own font can be reordered (English and typed text cannot).
+    function rowEntry(row) { return row && row.entry ? row.entry : ({}); }
+    function movable(e) { return !!e.enabled && !e.fixed && e.priority >= 0; }
+    function neighbour(e, dir) {
+        return ordered.some(o => movable(o) && (dir < 0 ? o.priority < e.priority : o.priority > e.priority));
+    }
     function summary(e) {
         if (e.code === "latin") return "Font: " + (e.font || "Default (reMarkable Sans)");
         if (e.code === "en") return "Always on";
@@ -92,13 +98,33 @@ Rectangle {
                     description: page.summary(modelData)
                     Layout.fillWidth: true
                     action: Row {
+                        readonly property var entry: modelData
                         spacing: 16
-                        ArkControls.Button {      // raise priority
-                            text: "↑"
-                            type: ArkTokens.Button.secondary
-                            visible: !!modelData.enabled && !modelData.fixed && modelData.priority > 0
-                                     && page.ordered.some(o => o.enabled && !o.fixed && o.priority < modelData.priority)
-                            onClicked: page.send("up:" + modelData.code)
+                        // Order arrows: smaller than the "›" button next to them.
+                        Repeater {
+                            model: [-1, 1]
+                            delegate: Rectangle {
+                                required property int modelData
+                                readonly property bool live: page.neighbour(page.rowEntry(parent), modelData)
+                                visible: page.movable(page.rowEntry(parent))
+                                anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+                                width: 60; height: 60; radius: 6
+                                color: "white"
+                                border.width: 2
+                                border.color: live ? "black" : "#b0b0b0"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData < 0 ? "▲" : "▼"
+                                    font.pixelSize: 24
+                                    color: parent.live ? "black" : "#b0b0b0"
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -8
+                                    enabled: parent.live
+                                    onClicked: page.send((parent.modelData < 0 ? "up:" : "down:") + page.rowEntry(parent.parent).code)
+                                }
+                            }
                         }
                         ArkControls.Button {
                             text: "›"
@@ -117,8 +143,7 @@ Rectangle {
             }
             ArkControls.Panel {
                 label: "Order"
-                description: "↑ moves a language up. Characters shared by languages (Chinese characters in Korean, "
-                             + "Japanese and Chinese) use the font of the first one."
+                description: "▲ ▼ set the order in which keyboards switch (Ctrl+Space, right Alt, the language button)."
                 Layout.fillWidth: true
                 Layout.topMargin: ArkControls.Values.spacing.large
             }
