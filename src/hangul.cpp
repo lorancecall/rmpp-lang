@@ -1,6 +1,7 @@
-// Hangul (2-beolsik) composition for the reMarkable on-screen keyboard.
-// Loaded into xochitl with LD_PRELOAD. It registers an extra keyboard layout
-// (ko_KR) and rewrites single-jamo commits into composed syllables.
+// rmpp-lang Korean keyboard: Hangul (2-beolsik) composition for the on-screen keyboard and physical keyboards.
+// Part of librmpp-lang.so (loaded into xochitl with LD_PRELOAD). The ko_KR layout comes from rmpp-lang.rcc
+// (registered by lang.cpp); this file rewrites single-jamo commits into composed syllables.
+#include "lang.h"
 #include <QtCore/QCoreApplication>
 #include <QtCore/QObject>
 #include <QtCore/QResource>
@@ -267,6 +268,7 @@ private:
 
         // Ctrl+Space: toggle, and swallow it so no space is typed.
         if (k->key() == Qt::Key_Space && (k->modifiers() & ~Qt::KeypadModifier) == Qt::ControlModifier) {
+            if (!rmpplang::keyboardEnabled(QStringLiteral("ko"))) return false;
             if (!k->isAutoRepeat() && k->timestamp() != lastToggleTs) {
                 lastToggleTs = k->timestamp();
                 setKorean(!g_korean, "key");
@@ -275,6 +277,7 @@ private:
             return true;
         }
         if (isToggleKey(k)) {
+            if (!rmpplang::keyboardEnabled(QStringLiteral("ko"))) return false;
             if (atFocus && !k->isAutoRepeat()) {
                 setKorean(!g_korean, "key");
                 reset();
@@ -476,6 +479,7 @@ Rectangle {
     anchors.right: parent.right; anchors.rightMargin: 112
     anchors.verticalCenter: parent.verticalCenter
     z: 5
+    visible: !!hangul.enabled
     Text {
         anchors.centerIn: parent
         text: hangul.korean ? "한" : "EN"
@@ -513,11 +517,7 @@ void syncIndicator() {
     }
 }
 
-void hangulInit() {
-    const char *rcc = qEnvironmentVariableIsSet("HANGUL_RCC") ? nullptr : "/usr/lib/rmpp-korean/ko_KR.rcc";
-    QString path = rcc ? QString::fromLatin1(rcc) : qEnvironmentVariable("HANGUL_RCC");
-    bool ok = QResource::registerResource(path);
-    qWarning("[hangul] layout %s: %s", qPrintable(path), ok ? "registered" : "FAILED");
+void init() {
     auto *app = QCoreApplication::instance();
     auto *filter = new HangulFilter(app);
     app->installEventFilter(filter);
@@ -525,11 +525,16 @@ void hangulInit() {
     g_state = new QQmlPropertyMap(app);
     g_state->insert(QStringLiteral("korean"), false);
     g_state->insert(QStringLiteral("command"), QString());
+    g_state->insert(QStringLiteral("enabled"), rmpplang::keyboardEnabled(QStringLiteral("ko")));
     QObject::connect(g_state, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) setKorean(!g_korean, "indicator");
     });
     auto *timer = new QTimer(filter);
     QObject::connect(timer, &QTimer::timeout, filter, [] {
+        // Korean keyboard turned off in Settings > Languages: back to English, indicator hidden.
+        const bool on = rmpplang::keyboardEnabled(QStringLiteral("ko"));
+        if (g_state->value(QStringLiteral("enabled")).toBool() != on) g_state->insert(QStringLiteral("enabled"), on);
+        if (!on && g_korean) setKorean(false, "settings");
         syncExternalKeyboard();
         followScreenLanguage();
         syncIndicator();
@@ -540,4 +545,4 @@ void hangulInit() {
 
 } // namespace
 
-Q_COREAPP_STARTUP_FUNCTION(hangulInit)
+void rmpplang::hangulInit() { init(); }
