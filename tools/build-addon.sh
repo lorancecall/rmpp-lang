@@ -18,6 +18,7 @@ for code in "$@"; do
   mkdir -p "$out"
   cp "$src/language.conf" "$out/"
   [ -f "$src/keymap.conf" ] && cp "$src/keymap.conf" "$out/"
+  [ -d "$src/dict" ] && mkdir -p "$out/dict" && cp "$src"/dict/* "$out/dict/"
   [ -d "$src/fonts" ] && mkdir -p "$out/fonts" && cp "$src"/fonts/* "$out/fonts/"
   [ -f "$src/LICENSE-fonts" ] && cp "$src/LICENSE-fonts" "$out/"
   if [ -f "$src/fonts.conf" ]; then

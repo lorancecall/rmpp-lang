@@ -1,3 +1,5 @@
 # Scripts run on the tablet and in POSIX shells: keep LF on every checkout.
 *.sh text eol=lf
 tools/rmpp-lang text eol=lf
+# Add-on data is copied to the tablet as is.
+languages/** text eol=lf
