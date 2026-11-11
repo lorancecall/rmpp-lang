@@ -227,20 +227,25 @@ ljmo / vjmo / tjmo features that draw them as one syllable (checked with fontToo
 the syllable. Later: physical-keyboard keys for the old letters; 방점 as Mandarin tones in the zh Hangul method
 (needs a dictionary with tones, e.g. CC-CEDICT).
 
-### Input methods to choose from (zh)
+### Input methods to choose from (zh, ja)
 
-A language can offer several input methods (`methods=`, first = default); the user picks one in Settings >
-Languages > (language) > Input, or with `rmpp-lang method CODE NAME` (`method.<code>` in lang.conf). The manifest's
+A language can offer several input methods (`methods=`, first = default; names in the language itself); the user
+picks one in Settings > Languages > (language) > Input (a popup, like the font), or with `rmpp-lang method CODE NAME` (`method.<code>` in lang.conf). The manifest's
 `key@method=` values override the plain keys for that method (input, layouts, requires, keyboard_name, label,
 convert, convert_dict, convert_map, convert_simplify). zh offers:
 
-- `hangul` (default): Mandarin sounds in Hangul (중궈 -> 中国), as above.
-- `pinyin`: letters on the Latin layout, the standard Chinese input: the letters before the cursor are the pinyin
+- `pinyin` (default, 拼音): letters on the Latin layout, the standard Chinese input: the letters before the cursor are the pinyin
   (no tones), candidates are the exact words then words starting with it (prediction), by frequency. Space
   converts, and picks the first candidate while the bar is open; 汉 / Hanja key / F9 also convert.
 - `hanja`: Korean Hanja readings (중국 -> 中国 / 中國) for those who know Hanja through Sino-Korean readings:
   the ko add-on's word dictionary (`convert_dict@hanja=@ko/dict/hanja.txt`, `@code/` = another add-on's folder),
   each word in Simplified (OpenCC, `dict/t2s.txt`) and Traditional.
+- `hangul` (韩文注音): Mandarin sounds in Hangul (중궈 -> 中国), as above.
+
+ja offers `romaji` (default, ローマ字入力: nihongo -> 日本語, Hepburn and kunrei-shiki, っ by a doubled
+consonant, ん by n / nn / n', ー by -, table `dict/romaji.map`; Space converts and picks) and `hangul`
+(ハングル入力: 니혼고 -> 日本語). A reading table whose keys are Latin letters makes the run the letters before the
+cursor.
 
 ### Next keyboards
 

@@ -166,12 +166,13 @@ Dict g_dict;
 struct ReadingMap {
     QString path;
     QDateTime stamp;
-    QHash<QString, QStringList> map;   // one or two Hangul syllables -> readings, strict first
+    QHash<QString, QStringList> map;   // one or two Hangul syllables (or romaji) -> readings, strict first
     int maxChunk = 1;
+    bool latin = false;                // keys are Latin letters (ja romaji): the run is the letters before the cursor
     bool load(const QString &p) {
         const QFileInfo fi(p);
         if (p == path && fi.lastModified() == stamp) return !map.isEmpty();
-        path = p; stamp = fi.lastModified(); map.clear(); maxChunk = 1;
+        path = p; stamp = fi.lastModified(); map.clear(); maxChunk = 1; latin = false;
         QFile f(p);
         if (!f.open(QIODevice::ReadOnly)) return false;
         while (!f.atEnd()) {
@@ -180,6 +181,7 @@ struct ReadingMap {
             const QString key = line.section(QLatin1Char('\t'), 0, 0);
             map.insert(key, line.section(QLatin1Char('\t'), 1).split(QLatin1Char(' '), Qt::SkipEmptyParts));
             if (!key.startsWith(QLatin1Char('^'))) maxChunk = qMax(maxChunk, int(key.size()));
+            if (!key.isEmpty() && key.at(0).unicode() < 0x80) latin = true;
         }
         qWarning("[hanja] reading table %s (%d entries)", qPrintable(p), int(map.size()));
         return !map.isEmpty();
@@ -299,17 +301,21 @@ QString toKatakana(const QString &s) {
 // The conversion of the current input language: kind ("" = none), dictionary and reading table.
 struct Conv {
     QString kind, dict, map, simplify;
-    bool latin() const { return kind == QLatin1String("pinyin") && map.isEmpty(); }   // pinyin typed in letters
+    bool latinMap = false;                    // reading table keyed by letters (ja romaji)
+    bool pinyinLetters() const { return kind == QLatin1String("pinyin") && map.isEmpty(); }
+    bool latin() const { return pinyinLetters() || latinMap; }   // typed in Latin letters: Space converts
 };
 Conv currentConv() {
     const QString code = rmpplang::currentInput();
     Conv c{rmpplang::convertKind(code), rmpplang::convertDict(code), rmpplang::convertMap(code),
            rmpplang::convertSimplify(code)};
+    if (!c.map.isEmpty() && g_readings.load(c.map)) c.latinMap = g_readings.latin;
     if (c.kind == QLatin1String("hanja") || c.kind == QLatin1String("pinyin")) return c;
     if (c.kind == QLatin1String("kana") && !c.map.isEmpty()) return c;
     return {};
 }
 bool isPinyinLetter(QChar c) { return (c >= QLatin1Char('a') && c <= QLatin1Char('z')) || (c >= QLatin1Char('A') && c <= QLatin1Char('Z')); }
+bool isRomajiChar(QChar c) { return isPinyinLetter(c) || c == QLatin1Char(0x2D) || c == QLatin1Char(0x27); }   // letters, - (long vowel), apostrophe (n')
 QString currentDict() { return currentConv().dict; }
 
 QString buttonLabel(const QString &kind) {
@@ -347,7 +353,7 @@ QList<Entry> candidatesFor(const Conv &conv, const QString &run, bool withKana) 
                 if (!seen.contains(w)) { seen.insert(w); out.append({w, e.note, 0}); }
         return out;
     }
-    if (conv.latin()) {   // pinyin letters: the exact words, then (for the whole run) words that start with it
+    if (conv.pinyinLetters()) {   // pinyin letters: the exact words, then (for the whole run) words that start with it
         const QString key = run.toLower();
         QList<Entry> out = g_dict.lookup(key);
         if (withKana) {
@@ -367,7 +373,7 @@ QList<Entry> candidatesFor(const Conv &conv, const QString &run, bool withKana) 
     const auto add = [&](const Entry &e) {
         if (!seen.contains(e.word)) { seen.insert(e.word); out.append(e); }
     };
-    const QStringList rs = readingsOf(run, kana);
+    const QStringList rs = readingsOf(conv.latinMap ? run.toLower() : run, kana);
     if (!kana) {   // pinyin: every reading's words, most frequent first
         for (const QString &r : rs)
             for (const Entry &e : g_dict.lookup(r)) add(e);
@@ -392,7 +398,10 @@ QList<Entry> candidatesFor(const Conv &conv, const QString &run, bool withKana) 
     for (const QString &r : rs)
         for (const Entry &e : okuriLookup(r)) add(e);
     if (withKana) {
-        if (const QString s = strictReading(run); !s.isEmpty()) { add({s, {}, 0}); add({toKatakana(s), {}, 0}); }
+        if (const QString s = strictReading(conv.latinMap ? run.toLower() : run); !s.isEmpty()) {
+            add({s, {}, 0});
+            add({toKatakana(s), {}, 0});
+        }
     }
     return out;
 }
@@ -427,7 +436,7 @@ bool convert() {
             return false;
         }
         int n = 0;
-        const auto inRun = conv.latin() ? isPinyinLetter : isSyllable;
+        bool (*inRun)(QChar) = conv.latinMap ? isRomajiChar : conv.latin() ? isPinyinLetter : isSyllable;
         const int maxRun = conv.latin() ? 40 : kMaxRun;
         while (n < maxRun && cur - n - 1 >= 0 && inRun(text.at(cur - n - 1))) ++n;
         for (int len = n; len >= 1 && cands.size() < kMaxCands; --len)
@@ -469,7 +478,7 @@ void turnPage(int delta) {
     if (p >= 0 && p < pages) g_map->insert(QStringLiteral("page"), p);
 }
 
-// Pinyin typed in letters: Space picks the first candidate while the bar is open, else converts the letters
+// Pinyin or romaji typed in letters: Space picks the first candidate while the bar is open, else converts the letters
 // before the cursor (a space is typed when there are none).
 bool spaceConverts() {
     const Conv conv = currentConv();
