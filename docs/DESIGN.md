@@ -306,7 +306,8 @@ convert_map=               # Hangul -> reading table for kana / pinyin; ja: dict
 convert_simplify=          # Traditional -> Simplified table for the candidates (zh hanja method)
 methods=                   # input methods the user can choose, first = default (zh: hangul pinyin hanja)
 method_name.<m>=           # how Settings names method <m>; key@<m>= overrides key for that method
-requires=                  # add-on whose on-screen layout this one uses; ja, zh: ko
+requires=                  # add-ons this one needs, comma list (ja, zh: ko, whose layout they type on); the
+                           # packages depend on rmpp-lang-<code> and the installer selects them too
 keyboard_default=1         # 0 = keyboard off until the user turns it on (ja, zh)
 ```
 

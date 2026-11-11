@@ -10,6 +10,8 @@
 // State for other add-ons (rmpp-hwr): /home/root/.config/rmpp-lang/state.json.
 #include "lang.h"
 
+#include <algorithm>
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
@@ -70,7 +72,7 @@ struct Lang {
                                                           // (+ the line for fonts that cannot render it)
     QString convert, convertDict, convertMap;             // conversion kind (hanja, kana, pinyin), dictionary, reading table
     bool keyboardDefault = true;                          // keyboard on until the user changes it (keyboard_default=)
-    QString requires;                                     // language whose layout this one types on (ja, zh: ko)
+    QStringList requires;                                 // add-ons this one needs (ja, zh: ko, whose layout they type on)
     QString convertSimplify;                              // Traditional -> Simplified table for candidates (zh hanja)
     QHash<QString, QString> kv;                           // the manifest, for input methods (key@method=)
     QStringList methods;                                  // input methods the user can choose (methods=), first = default
@@ -150,7 +152,7 @@ void applyMethod(Lang &l) {
     l.convertDict = get("convert_dict");
     l.convertMap = get("convert_map");
     l.convertSimplify = get("convert_simplify");
-    l.requires = get("requires");
+    l.requires = get("requires").split(',', Qt::SkipEmptyParts);
 }
 void applyMethods() {
     for (Lang &l : g_langs) applyMethod(l);
@@ -200,7 +202,7 @@ void loadLanguages() {
         l.convertDict = kv.value("convert_dict");
         l.convertMap = kv.value("convert_map");
         l.keyboardDefault = kv.value("keyboard_default", "1") != QLatin1String("0");
-        l.requires = kv.value("requires");
+        l.requires = kv.value("requires").split(',', Qt::SkipEmptyParts);
         l.kv = kv;
         l.methods = kv.value("methods").split(' ', Qt::SkipEmptyParts);
         applyMethod(l);
@@ -532,7 +534,7 @@ bool languageEnabled(const QString &code) { return findLang(code) && enabledCode
 bool keyboardEnabled(const QString &code) {
     const Lang *l = findLang(code);
     return l && l->input != QLatin1String("none") && languageEnabled(code)
-        && (l->requires.isEmpty() || findLang(l->requires))
+        && std::all_of(l->requires.begin(), l->requires.end(), [](const QString &r) { return findLang(r.trimmed()) != nullptr; })
         && confValue(QStringLiteral("keyboard.") + code, l->keyboardDefault ? QStringLiteral("1") : QStringLiteral("0"))
                != QLatin1String("0");
 }
