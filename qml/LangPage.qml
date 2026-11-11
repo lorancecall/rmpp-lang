@@ -37,9 +37,8 @@ Rectangle {
         parts.push("Font: " + (e.font || "Default"));
         return parts.join(" · ");
     }
-    function sampleFont(e, fam) {
-        return fam || (e.code === "latin" ? "reMarkable Sans" : "reMarkable Sans");
-    }
+    // "" = Default: show the device's own choice, not the current fallback.
+    function sampleFont(e, fam) { return fam || e.deviceDefault || "reMarkable Sans"; }
 
     x: payloadLoaderRef.x
     y: payloadLoaderRef.y
@@ -103,7 +102,7 @@ Rectangle {
                 label: "Add a language or a font"
                 description: "Languages are add-ons: choose them in the rmpp installer. Fonts: rmpp-lang font add "
                              + "MyFont.ttf --lang ko from your computer, or copy .ttf / .otf files into "
-                             + "/home/root/.local/share/fonts/rmpp-lang/<language>/."
+                             + "/home/root/.local/share/fonts/rmpp-lang/ followed by the language code (ko, ja, zh, latin, ...)."
                 Layout.fillWidth: true
                 Layout.topMargin: ArkControls.Values.spacing.large
             }

@@ -563,6 +563,16 @@ void probe() {
     qWarning("[rmpp-lang] probe written to %s", qPrintable(kProbeOut));
 }
 
+// What the tablet shows for a language without rmpp-lang: the first device family it knows of
+// (fontconfig's own choice for the script), or xochitl's font.
+QString deviceDefault(const Lang &l) {
+    if (l.code == QLatin1String("latin") || l.code == QLatin1String("en")) return QStringLiteral("reMarkable Sans");
+    const QStringList all = QFontDatabase::families();
+    for (const QString &f : l.known)
+        if (f != l.defaultFont && all.contains(f)) return f;
+    return QStringLiteral("reMarkable Sans");
+}
+
 // ---- physical keyboards for add-ons with a keymap.conf ----
 // Korean (hangul.cpp) handles the toggle keys and Korean itself; this filter types the add-on's characters while
 // its language is the input language.
@@ -624,6 +634,7 @@ void publish() {
             {"rtl", l.rtl},
             {"font", fontOf(code)},
             {"families", QJsonArray::fromStringList(fams)},
+            {"deviceDefault", deviceDefault(l)},
             {"fontDir", kFontRoot + '/' + code},
         });
     }
