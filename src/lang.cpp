@@ -68,7 +68,9 @@ struct Lang {
     QString code, name, native, input, defaultFont, dir;   // input: layout | compose:<name> | none
     QString label, keyboardName, sample, samplePlain;     // indicator text, layout name, Settings sample line
                                                           // (+ the line for fonts that cannot render it)
-    QString convert, convertDict;                         // conversion kind (hanja) and its dictionary file
+    QString convert, convertDict, convertMap;             // conversion kind (hanja, kana, pinyin), dictionary, reading table
+    bool keyboardDefault = true;                          // keyboard on until the user changes it (keyboard_default=)
+    QString requires;                                     // language whose layout this one types on (ja, zh: ko)
     QList<QChar::Script> scripts;
     QStringList layouts, known;                           // on-screen layout ids; device families worth offering
     bool han = false, rtl = false, builtin = false;
@@ -166,6 +168,9 @@ void loadLanguages() {
         l.samplePlain = kv.value("sample_plain");
         l.convert = kv.value("convert");
         l.convertDict = kv.value("convert_dict");
+        l.convertMap = kv.value("convert_map");
+        l.keyboardDefault = kv.value("keyboard_default", "1") != QLatin1String("0");
+        l.requires = kv.value("requires");
         if (!l.defaultFont.isEmpty()) l.known << l.defaultFont;
         for (const QString &f : kv.value("families").split(',', Qt::SkipEmptyParts))
             if (!l.known.contains(f.trimmed())) l.known << f.trimmed();
@@ -474,11 +479,19 @@ QString convertDict(const QString &code) {
     return l->dir + QLatin1Char('/') + l->convertDict;
 }
 
+QString convertMap(const QString &code) {
+    const Lang *l = findLang(code);
+    if (!l || l->convertMap.isEmpty() || l->convertMap.contains(QLatin1String(".."))) return {};
+    return l->dir + QLatin1Char('/') + l->convertMap;
+}
+
 bool languageEnabled(const QString &code) { return findLang(code) && enabledCodes().contains(code); }
 bool keyboardEnabled(const QString &code) {
     const Lang *l = findLang(code);
     return l && l->input != QLatin1String("none") && languageEnabled(code)
-        && confValue(QStringLiteral("keyboard.") + code, QStringLiteral("1")) != QLatin1String("0");
+        && (l->requires.isEmpty() || findLang(l->requires))
+        && confValue(QStringLiteral("keyboard.") + code, l->keyboardDefault ? QStringLiteral("1") : QStringLiteral("0"))
+               != QLatin1String("0");
 }
 
 // ---- input language for physical keyboards (Ctrl+Space / right Alt cycle) ----
@@ -509,8 +522,11 @@ QString screenLayoutFor(const QString &code) {
     return l && !l->layouts.isEmpty() ? l->layouts.first() : QString();
 }
 QString inputForScreenLayout(const QString &layout) {
-    for (const Lang &l : g_langs)
-        if (l.layouts.contains(layout) && keyboardEnabled(l.code)) return l.code;
+    // Several languages can type on one layout (ja / zh are typed in Hangul on ko_KR): keep the current one if it
+    // uses this layout, else the first in priority order.
+    if (const Lang *cur = findLang(currentInput()); cur && cur->layouts.contains(layout)) return cur->code;
+    for (const QString &c : enabledCodes())
+        if (const Lang *l = findLang(c); l && l->layouts.contains(layout) && keyboardEnabled(c)) return c;
     return QStringLiteral("en");
 }
 QString inputLabel() {

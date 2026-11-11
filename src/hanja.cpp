@@ -1,14 +1,20 @@
-// rmpp-lang: Hangul -> Hanja conversion (add-ons with convert=hanja, e.g. ko).
+// rmpp-lang: conversion from Hangul, with one candidate bar for every kind of add-on:
+//   convert=hanja   (ko) Hangul -> Hanja, the dictionary is keyed by Hangul.
+//   convert=kana    (ja) Japanese typed in Hangul: syllables -> kana by the add-on's reading table (convert_map),
+//                   then kana -> words (SKK dictionary, okurigana endings added by the core).
+//   convert=pinyin  (zh) Chinese typed in Hangul as Koreans spell Mandarin: one or two syllables -> a pinyin
+//                   syllable by the reading table, then pinyin -> words ranked by frequency.
 //
-// Trigger: the "漢" button on the keyboard's format bar, or the Hanja / F9 key of a physical keyboard. The word
-// before the cursor (or the selection) is looked up; a candidate bar on the format bar lists the Hanja for the
-// longest matching run of syllables first, then shorter ones down to the last syllable. Picking one replaces those
-// syllables with an input-method commit (the same kind of replace-before-cursor commit the Hangul engine uses).
-// While the bar is open, 1-9 pick, Left/Right/Space page, Esc closes.
+// Trigger: the button on the keyboard's format bar (漢 / 変 / 汉), or the Hanja / F9 key of a physical keyboard.
+// The selection, or the Hangul syllables before the cursor, are looked up: candidates for the longest run first,
+// then shorter ones down to the last syllable. Picking one replaces those syllables with an input-method commit
+// (the same kind of replace-before-cursor commit the Hangul engine uses). While the bar is open, 1-9 pick,
+// Left/Right/Space page, Esc closes.
 //
-// Dictionary: the add-on's convert_dict (languages/ko/dict/hanja.txt, built by tools/hanja-dict.py from libhangul,
-// BSD-3-Clause): `reading:hanja:meaning` lines sorted by the reading's UTF-8 bytes, memory-mapped and
-// binary-searched, so nothing is loaded into xochitl's memory.
+// Dictionaries (the add-on's convert_dict, built by tools/hanja-dict.py, ja-dict.py, zh-dict.py): lines
+// `reading:word:note` or `reading<TAB>word<TAB>note[<TAB>weight]`, sorted by the reading's UTF-8 bytes,
+// memory-mapped and binary-searched, so they are not loaded into xochitl's memory. Reading tables are small and
+// read into memory.
 
 #include "lang.h"
 
@@ -16,10 +22,12 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QHash>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
+#include <QtCore/QSet>
 #include <QtCore/QTimer>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QInputMethodEvent>
@@ -34,15 +42,20 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 
 namespace {
 
-constexpr int kMaxRun = 8;        // syllables looked at before the cursor
+constexpr int kMaxRun = 10;       // syllables looked at before the cursor
 constexpr int kMaxCands = 300;    // candidates shown in total
+constexpr int kMaxReadings = 48;  // readings tried per run (kana / pinyin)
+constexpr int kMaxNodes = 4000;   // search steps per run
 
 bool isSyllable(QChar c) { return c.unicode() >= 0xAC00 && c.unicode() <= 0xD7A3; }
 
 // ---- dictionary ----
+
+struct Entry { QString word, note; qint64 weight = 0; };
 
 class Dict {
 public:
@@ -68,25 +81,31 @@ public:
         m_data = nullptr; m_size = m_start = 0; m_path.clear();
     }
 
-    // Entries for one reading, in file order: (hanja, meaning).
-    QList<QPair<QString, QString>> lookup(const QString &reading) const {
-        QList<QPair<QString, QString>> out;
+    // Entries for one reading, in file order.
+    QList<Entry> lookup(const QString &reading) const {
+        QList<Entry> out;
         if (!m_data) return out;
         const QByteArray key = reading.toUtf8();
-        qint64 lo = m_start, hi = m_size;
-        while (lo < hi) {                       // first line whose reading is >= key
-            qint64 ls = (lo + hi) / 2;
-            while (ls > lo && m_data[ls - 1] != '\n') --ls;
-            if (compare(ls, key) < 0) lo = lineEnd(ls) + 1;
-            else hi = ls;
-        }
-        for (qint64 p = lo; p < m_size && compare(p, key) == 0; p = lineEnd(p) + 1) {
+        for (qint64 p = lowerBound(key); p < m_size && compare(p, key) == 0; p = lineEnd(p) + 1) {
             const qint64 e = lineEnd(p);
             const QString line = QString::fromUtf8(reinterpret_cast<const char *>(m_data + p), int(e - p));
-            const QStringList f = line.split(QLatin1Char(':'));
-            if (f.size() >= 2) out.append({f.at(1), f.mid(2).join(QLatin1Char(':'))});
+            if (line.contains(QLatin1Char('\t'))) {
+                const QStringList f = line.split(QLatin1Char('\t'));
+                if (f.size() >= 2) out.append({f.at(1), f.value(2), f.value(3).toLongLong()});
+            } else {
+                const QStringList f = line.split(QLatin1Char(':'));
+                if (f.size() >= 2) out.append({f.at(1), f.mid(2).join(QLatin1Char(':')), 0});
+            }
         }
         return out;
+    }
+    // Does any reading start with prefix?
+    bool hasPrefix(const QString &prefix) const {
+        if (!m_data) return false;
+        const QByteArray key = prefix.toUtf8();
+        const qint64 p = lowerBound(key);
+        return p < m_size && m_size - p >= key.size()
+            && std::memcmp(m_data + p, key.constData(), size_t(key.size())) == 0;
     }
 
 private:
@@ -100,11 +119,22 @@ private:
         const void *nl = std::memchr(m_data + p, '\n', size_t(m_size - p));
         return nl ? static_cast<const uchar *>(nl) - m_data : m_size;
     }
-    // The line's reading (up to ':') against key, as bytes.
+    qint64 lowerBound(const QByteArray &key) const {   // first line whose reading is >= key
+        qint64 lo = m_start, hi = m_size;
+        while (lo < hi) {
+            qint64 ls = (lo + hi) / 2;
+            while (ls > lo && m_data[ls - 1] != '\n') --ls;
+            if (compare(ls, key) < 0) lo = lineEnd(ls) + 1;
+            else hi = ls;
+        }
+        return lo;
+    }
+    // The line's reading (up to ':' or tab) against key, as bytes.
     int compare(qint64 p, const QByteArray &key) const {
         const qint64 e = lineEnd(p);
-        const void *colon = std::memchr(m_data + p, ':', size_t(e - p));
-        const qint64 n = colon ? static_cast<const uchar *>(colon) - (m_data + p) : e - p;
+        qint64 n = p;
+        while (n < e && m_data[n] != ':' && m_data[n] != '\t') ++n;
+        n -= p;
         const int c = std::memcmp(m_data + p, key.constData(), size_t(qMin<qint64>(n, key.size())));
         if (c) return c;
         return n < key.size() ? -1 : n > key.size() ? 1 : 0;
@@ -113,16 +143,134 @@ private:
 
 Dict g_dict;
 
-// The dictionary of the current input language ("" = it converts nothing).
-QString currentDict() {
+// ---- reading tables (Hangul -> kana / pinyin) ----
+
+struct ReadingMap {
+    QString path;
+    QDateTime stamp;
+    QHash<QString, QStringList> map;   // one or two Hangul syllables -> readings, strict first
+    int maxChunk = 1;
+    bool load(const QString &p) {
+        const QFileInfo fi(p);
+        if (p == path && fi.lastModified() == stamp) return !map.isEmpty();
+        path = p; stamp = fi.lastModified(); map.clear(); maxChunk = 1;
+        QFile f(p);
+        if (!f.open(QIODevice::ReadOnly)) return false;
+        while (!f.atEnd()) {
+            const QString line = QString::fromUtf8(f.readLine()).trimmed();
+            if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) continue;
+            const QString key = line.section(QLatin1Char('\t'), 0, 0);
+            map.insert(key, line.section(QLatin1Char('\t'), 1).split(QLatin1Char(' '), Qt::SkipEmptyParts));
+            if (!key.startsWith(QLatin1Char('^'))) maxChunk = qMax(maxChunk, int(key.size()));
+        }
+        qWarning("[hanja] reading table %s (%d entries)", qPrintable(p), int(map.size()));
+        return !map.isEmpty();
+    }
+};
+ReadingMap g_readings;
+
+// SKK's okurigana key letter for the first kana of a word ending (書く: かk).
+QChar okuriLetter(QChar k) {
+    static const QHash<QChar, QChar> m = [] {
+        QHash<QChar, QChar> h;
+        const struct { const char16_t *kana; char letter; } rows[] = {
+            {u"あ", 'a'}, {u"い", 'i'}, {u"う", 'u'}, {u"え", 'e'}, {u"お", 'o'}, {u"かきくけこ", 'k'},
+            {u"がぎぐげご", 'g'}, {u"さしすせそ", 's'}, {u"ざじずぜぞ", 'z'}, {u"たちつてとっ", 't'},
+            {u"だぢづでど", 'd'}, {u"なにぬねの", 'n'}, {u"はひふへほ", 'h'}, {u"ばびぶべぼ", 'b'},
+            {u"ぱぴぷぺぽ", 'p'}, {u"まみむめも", 'm'}, {u"やゆよ", 'y'}, {u"らりるれろ", 'r'}, {u"わを", 'w'},
+            {u"ん", 'n'}};
+        for (const auto &r : rows)
+            for (const char16_t *c = r.kana; *c; ++c) h.insert(QChar(*c), QChar::fromLatin1(r.letter));
+        return h;
+    }();
+    return m.value(k);
+}
+
+// Kana word with an okurigana ending: stem key + ending (かk + く -> 書く).
+QList<Entry> okuriLookup(const QString &kana) {
+    QList<Entry> out;
+    for (int j = int(kana.size()) - 1; j >= qMax(1, int(kana.size()) - 4); --j) {   // endings of up to 4 kana
+        const QChar l = okuriLetter(kana.at(j));
+        if (l.isNull()) continue;
+        for (Entry e : g_dict.lookup(kana.left(j) + l)) {
+            e.word += kana.mid(j);
+            out.append(e);
+        }
+    }
+    return out;
+}
+bool okuriStemExists(const QString &kana) {
+    for (int j = int(kana.size()) - 1; j >= 1; --j)
+        if (const QChar l = okuriLetter(kana.at(j)); !l.isNull() && !g_dict.lookup(kana.left(j) + l).isEmpty())
+            return true;
+    return false;
+}
+
+// Readings of a Hangul run that the dictionary knows (for kana also those ending in an okurigana word).
+QStringList readingsOf(const QString &run, bool kana) {
+    QStringList out;
+    int nodes = 0;
+    std::function<void(int, const QString &, bool)> walk = [&](int pos, const QString &built, bool ending) {
+        if (out.size() >= kMaxReadings || ++nodes > kMaxNodes) return;
+        if (pos == run.size()) { if (!out.contains(built)) out.append(built); return; }
+        for (int len = qMin(g_readings.maxChunk, int(run.size()) - pos); len >= 1; --len) {
+            // "^syllable": the order of readings at the start of a word (voiceless kana first for ja)
+            auto it = pos == 0 ? g_readings.map.constFind(QLatin1Char('^') + run.mid(pos, len)) : g_readings.map.constEnd();
+            if (it == g_readings.map.constEnd()) it = g_readings.map.constFind(run.mid(pos, len));
+            if (it == g_readings.map.constEnd()) continue;
+            for (int a = 0; a < it->size(); ++a) {
+                if (ending && a > 0) break;          // inside an okurigana ending: only the strict kana
+                const QString next = built + it->at(a);
+                if (ending || g_dict.hasPrefix(next)) walk(pos + len, next, ending);
+                else if (kana && okuriStemExists(next)) walk(pos + len, next, true);
+            }
+        }
+    };
+    walk(0, QString(), false);
+    return out;
+}
+
+// The strict reading of a run (first alternative of each syllable), "" if a syllable has none.
+QString strictReading(const QString &run) {
+    QString out;
+    for (int pos = 0; pos < run.size();) {
+        bool found = false;
+        for (int len = qMin(g_readings.maxChunk, int(run.size()) - pos); len >= 1 && !found; --len) {
+            const auto it = g_readings.map.constFind(run.mid(pos, len));
+            if (it != g_readings.map.constEnd() && !it->isEmpty()) { out += it->first(); pos += len; found = true; }
+        }
+        if (!found) return {};
+    }
+    return out;
+}
+
+QString toKatakana(const QString &s) {
+    QString out = s;
+    for (QChar &c : out)
+        if (c.unicode() >= 0x3041 && c.unicode() <= 0x3096) c = QChar(char16_t(c.unicode() + 0x60));
+    return out;
+}
+
+// The conversion of the current input language: kind ("" = none), dictionary and reading table.
+struct Conv { QString kind, dict, map; };
+Conv currentConv() {
     const QString code = rmpplang::currentInput();
-    if (rmpplang::convertKind(code) != QLatin1String("hanja")) return {};
-    return rmpplang::convertDict(code);
+    Conv c{rmpplang::convertKind(code), rmpplang::convertDict(code), rmpplang::convertMap(code)};
+    if (c.kind == QLatin1String("hanja")) return c;
+    if ((c.kind == QLatin1String("kana") || c.kind == QLatin1String("pinyin")) && !c.map.isEmpty()) return c;
+    return {};
+}
+QString currentDict() { return currentConv().dict; }
+
+QString buttonLabel(const QString &kind) {
+    if (kind == QLatin1String("kana")) return QStringLiteral("変");
+    if (kind == QLatin1String("pinyin")) return QStringLiteral("汉");
+    return QStringLiteral("漢");
 }
 
 // ---- state shared with the QML on the format bar ----
 
-QQmlPropertyMap *g_map = nullptr;   // available, open, cands (JSON), page, perPage; command written by QML
+QQmlPropertyMap *g_map = nullptr;   // available, label, open, cands (JSON), page, perPage; command written by QML
 QPointer<QObject> g_target;         // the text field the candidates are for
 struct Cand { QString hanja, meaning; int len; };
 QList<Cand> g_cands;
@@ -137,10 +285,50 @@ void closeBar() {
     }
 }
 
+// Candidates for one Hangul run (all of it is replaced).
+QList<Entry> candidatesFor(const Conv &conv, const QString &run, bool withKana) {
+    if (conv.kind == QLatin1String("hanja")) return g_dict.lookup(run);
+    const bool kana = conv.kind == QLatin1String("kana");
+    QList<Entry> out;
+    QSet<QString> seen;
+    const auto add = [&](const Entry &e) {
+        if (!seen.contains(e.word)) { seen.insert(e.word); out.append(e); }
+    };
+    const QStringList rs = readingsOf(run, kana);
+    if (!kana) {   // pinyin: every reading's words, most frequent first
+        for (const QString &r : rs)
+            for (const Entry &e : g_dict.lookup(r)) add(e);
+        std::stable_sort(out.begin(), out.end(), [](const Entry &a, const Entry &b) { return a.weight > b.weight; });
+        return out;
+    }
+    // kana: SKK has no frequencies, and Korean spelling leaves voicing open at the start of a word (지칸 = じかん,
+    // 간지 = かんじ): take the readings' words in turns (first of each, then second of each, ...), then the kana of
+    // the readings that matched, then okurigana forms, then plain hiragana / katakana.
+    QList<QList<Entry>> lists;
+    QStringList matched;
+    for (const QString &r : rs) {
+        lists.append(g_dict.lookup(r));
+        if (!lists.last().isEmpty() && matched.size() < 3) matched.append(r);
+    }
+    for (int i = 0, more = 1; more; ++i) {
+        more = 0;
+        for (const auto &l : std::as_const(lists))
+            if (i < l.size()) { add(l.at(i)); more = 1; }
+    }
+    for (const QString &r : std::as_const(matched)) add({r, {}, 0});
+    for (const QString &r : rs)
+        for (const Entry &e : okuriLookup(r)) add(e);
+    if (withKana) {
+        if (const QString s = strictReading(run); !s.isEmpty()) { add({s, {}, 0}); add({toKatakana(s), {}, 0}); }
+    }
+    return out;
+}
+
 // Look up the selection, or the syllables before the cursor, and open the bar.
 bool convert() {
-    const QString path = currentDict();
-    if (path.isEmpty() || !g_dict.open(path)) return false;
+    const Conv conv = currentConv();
+    if (conv.kind.isEmpty() || !g_dict.open(conv.dict)) return false;
+    if (!conv.map.isEmpty() && !g_readings.load(conv.map)) return false;
     QObject *obj = QGuiApplication::focusObject();
     if (!obj) return false;
     QInputMethodQueryEvent q(Qt::ImSurroundingText | Qt::ImCursorPosition | Qt::ImAnchorPosition
@@ -157,9 +345,9 @@ bool convert() {
         // A selected word: replace exactly the selection.
         const QString word = sel.trimmed();
         if (word.size() > kMaxRun || !std::all_of(word.begin(), word.end(), isSyllable)) return false;
-        for (const auto &e : g_dict.lookup(word)) cands.append({e.first, e.second, -1});
-        g_selLen = sel.size();
-        g_selFrom = (anchor < cur) ? -sel.size() : 0;
+        for (const Entry &e : candidatesFor(conv, word, true)) cands.append({e.word, e.note, -1});
+        g_selLen = int(sel.size());
+        g_selFrom = (anchor < cur) ? -int(sel.size()) : 0;
     } else {
         if (cur <= 0 || cur > text.size()) {
             qWarning("[hanja] no text before the cursor (field gives %d chars, cursor %d)", int(text.size()), cur);
@@ -168,8 +356,8 @@ bool convert() {
         int n = 0;
         while (n < kMaxRun && cur - n - 1 >= 0 && isSyllable(text.at(cur - n - 1))) ++n;
         for (int len = n; len >= 1 && cands.size() < kMaxCands; --len)
-            for (const auto &e : g_dict.lookup(text.mid(cur - len, len))) {
-                cands.append({e.first, e.second, len});
+            for (const Entry &e : candidatesFor(conv, text.mid(cur - len, len), len == n)) {
+                cands.append({e.word, e.note, len});
                 if (cands.size() >= kMaxCands) break;
             }
     }
@@ -258,7 +446,7 @@ Item {
         border.color: "white"; border.width: 2
         Text {
             anchors.centerIn: parent
-            text: "漢"
+            text: hanja.label || "漢"
             color: hanja.open ? "black" : "white"
             // Regular weight: bold 漢 at this size filled in on e-paper (developer: "thinner font")
             font.family: "Noto Sans KR"; font.weight: Font.Normal; font.pixelSize: 34
@@ -379,6 +567,7 @@ void rmpplang::hanjaInit() {
     app->installEventFilter(filter);
     g_map = new QQmlPropertyMap(app);
     g_map->insert(QStringLiteral("available"), false);
+    g_map->insert(QStringLiteral("label"), QStringLiteral("漢"));
     g_map->insert(QStringLiteral("open"), false);
     g_map->insert(QStringLiteral("cands"), QStringLiteral("[]"));
     g_map->insert(QStringLiteral("page"), 0);
@@ -389,7 +578,10 @@ void rmpplang::hanjaInit() {
     });
     auto *timer = new QTimer(filter);
     QObject::connect(timer, &QTimer::timeout, filter, [] {
-        const bool avail = !currentDict().isEmpty() && QFileInfo::exists(currentDict());
+        const Conv conv = currentConv();
+        const bool avail = !conv.dict.isEmpty() && QFileInfo::exists(conv.dict);
+        if (g_map->value(QStringLiteral("label")).toString() != buttonLabel(conv.kind))
+            g_map->insert(QStringLiteral("label"), buttonLabel(conv.kind));
         if (g_map->value(QStringLiteral("available")).toBool() != avail) {
             g_map->insert(QStringLiteral("available"), avail);
             if (!avail) closeBar();

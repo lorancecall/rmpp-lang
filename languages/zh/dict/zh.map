@@ -1,0 +1,625 @@
+# Hangul -> pinyin for rmpp-lang (tools/zh-dict.py)
+가	ga
+가오	gao
+가우	gao
+가이	gai
+간	gan
+강	gang
+개	gai
+거	ge
+거우	gou
+건	gen
+겅	geng
+게	gei
+게이	gei
+고	gou
+고우	gou
+공	gong
+과	gua
+과이	guai
+관	guan
+광	guang
+괘	guai
+구	gu
+구오	guo
+구이	gui
+군	gun
+궁	gong
+궈	guo
+궤	gui
+궤이	gui
+귀	gui
+그	ge
+근	gen
+긍	geng
+나	na nia
+나오	nao niao
+나우	nao
+나이	nai
+난	nan
+낭	nang niang
+내	nai
+냐	nia
+냐오	niao
+냥	niang
+너	ne
+너우	nou
+넌	nen
+넝	neng
+네	nei nie
+네이	nei
+넨	nian
+년	nian
+녜	nie
+녠	nian
+노	nou
+노우	nou
+농	nong
+놘	nuan
+뇨	niao
+누	niu nu
+누오	nuo
+눈	nun
+눙	nong
+눠	nuo
+눼	nve
+뉘	nv
+뉘에	nve
+뉴	niu
+느	ne
+는	nen
+능	neng
+니	ni
+니엔	nian
+니우	niu
+닌	nin
+닝	ning
+다	da dia
+다오	dao diao
+다우	dao
+다이	dai
+단	dan
+당	dang
+대	dai
+댜	dia
+댜오	diao
+더	de
+더우	dou
+던	den
+덩	deng
+데	dei die
+데이	dei
+덴	dian
+뎐	dian
+뎨	die
+뎬	dian
+도	dou
+도우	dou
+동	dong
+돤	duan
+됴	diao
+두	diu du
+두오	duo
+두이	dui
+둔	dun
+둥	dong
+둬	duo
+뒈	dui
+뒈이	dui
+뒤	dui
+듀	diu
+드	de
+든	den
+등	deng
+디	di
+디엔	dian
+디우	diu
+딘	din
+딩	ding
+라	la lia
+라오	lao liao rao
+라우	lao rao
+라이	lai
+란	lan ran
+랑	lang liang rang
+래	lai
+랴	lia
+랴오	liao
+량	liang
+러	le re
+러우	lou rou
+런	ren
+렁	leng reng
+레	lei lie
+레이	lei
+렌	lian
+련	lian
+례	lie
+롄	lian
+로	lo lou rou
+로우	lou rou
+롱	long rong
+롸	rua
+롼	luan ruan
+료	liao
+루	liu lu ru
+루오	luo ruo
+루이	rui
+룬	lun run
+룽	long rong
+뤄	lo luo ruo
+뤈	lvan
+뤠	lve rui
+뤠이	rui
+뤼	lv rui
+뤼안	lvan
+뤼에	lve
+류	liu
+르	le re ri
+른	ren
+릉	leng reng
+리	li ri
+리엔	lian
+리우	liu
+린	lin
+링	ling
+마	ma
+마오	mao miao
+마우	mao
+마이	mai
+만	man
+망	mang
+매	mai
+먀오	miao
+머	me
+머우	mou
+먼	men
+멍	meng
+메	mei mie
+메이	mei
+멘	mian
+면	mian
+몌	mie
+몐	mian
+모	mo mou
+모우	mou
+묘	miao
+무	miu mu
+뭐	mo
+뮤	miu
+므	me
+믄	men
+믕	meng
+미	mi
+미엔	mian
+미우	miu
+민	min
+밍	ming
+바	ba
+바오	bao biao
+바우	bao
+바이	bai
+반	ban
+방	bang biang
+배	bai
+뱌오	biao
+뱡	biang
+번	ben
+벙	beng
+베	bei bie
+베이	bei
+벤	bian
+변	bian
+볘	bie
+볜	bian
+보	bo
+뵤	biao
+부	bu
+붜	bo
+븐	ben
+븡	beng
+비	bi
+비엔	bian
+빈	bin
+빙	bing
+사	sa sha xia
+사오	sao shao xiao
+사우	sao shao
+사이	sai shai
+산	san shan
+상	sang shang xiang
+새	sai shai
+샤	xia
+샤오	xiao
+샹	xiang
+서	se she
+서우	shou sou
+선	sen shen
+성	seng sheng
+세	sei shei xie
+세이	sei shei
+센	xian
+션	xian
+셰	xie
+셴	xian
+소	shou sou
+소우	shou sou
+송	song
+솨	shua
+솨이	shuai
+솬	shuan suan
+솽	shuang
+쇄	shuai
+쇼	xiao
+수	shu su xiu
+수오	shuo suo
+수이	shui sui
+순	shun sun
+숭	song xiong
+숴	shuo suo
+숸	xuan
+쉐	shui sui xue
+쉐이	shui sui
+쉬	shui sui xu
+쉬안	xuan
+쉬에	xue
+쉰	xun
+슈	xiu
+슝	xiong
+스	se she shi si
+슨	sen shen
+승	seng sheng
+시	shi si xi
+시엔	xian
+시우	xiu
+신	xin
+싱	xing
+싸	sa
+싸오	sao
+싸우	sao
+싸이	sai
+싼	san
+쌍	sang
+쌔	sai
+써	se
+써우	sou
+썬	sen
+썽	seng
+쎄	sei
+쎄이	sei
+쏘	sou
+쏘우	sou
+쏭	song
+쏸	suan
+쑤	su
+쑤오	suo
+쑤이	sui
+쑨	sun
+쑹	song
+쒀	suo
+쒜	sui
+쒜이	sui
+쒸	sui
+쓰	se si
+쓴	sen
+씅	seng
+씨	si
+아	a ya
+아오	ao yao
+아우	ao
+아이	ai yai
+안	an
+앙	ang yang
+애	ai yai
+야	ya
+야오	yao
+양	yang
+얜	yan
+어	e
+어우	ou
+언	en
+얼	er
+엉	eng
+에	ei
+에이	ei
+여우	you
+연	yan
+예	ye
+옌	yan
+오	o ou
+오우	ou
+옹	wong
+와	wa
+와이	wai
+완	wan
+왕	wang
+왜	wai
+요	yao yo
+우	wu
+웅	wong
+워	o wo
+원	wen yuan
+웡	weng
+웨	wei yue
+웨이	wei
+위	yu
+위안	yuan
+위에	yue
+윈	yun
+유	you
+융	yong
+으	e
+은	en
+응	eng
+이	yi
+인	yin
+잉	ying
+자	jia za zha
+자오	jiao zao zhao
+자우	zao zhao
+자이	zai zhai
+잔	zan zhan
+장	jiang zang zhang
+재	zai zhai
+쟈	jia
+쟈오	jiao
+쟝	jiang
+저	ze zhe
+저우	zhou zou
+전	zen zhen
+정	zeng zheng
+제	jie zei zhei
+제이	zei zhei
+젠	jian
+젼	jian
+졔	jie
+졘	jian
+조	zhou zou
+조우	zhou zou
+종	zhong zong
+좌	zhua
+좌이	zhuai
+좐	zhuan zuan
+좡	zhuang
+좨	zhuai
+죠	jiao
+주	jiu zhu zu
+주오	zhuo zuo
+주이	zhui zui
+준	zhun zun
+중	jiong zhong zong
+줘	zhuo zuo
+줜	juan
+줴	jue zhui zui
+줴이	zhui zui
+쥐	ju zhui zui
+쥐안	juan
+쥐에	jue
+쥔	jun
+쥬	jiu
+즁	jiong
+즈	ze zhe zhi zi
+즌	zen zhen
+증	zeng zheng
+지	ji zhi zi
+지엔	jian
+지우	jiu
+진	jin
+징	jing
+짜	ca za
+짜오	cao zao
+짜우	cao zao
+짜이	cai zai
+짠	can zan
+짱	cang zang
+째	cai zai
+쩌	ce ze
+쩌우	cou zou
+쩐	cen zen
+쩡	ceng zeng
+쩨	cei zei
+쩨이	cei zei
+쪼	cou zou
+쪼우	cou zou
+쫑	cong zong
+쫜	cuan zuan
+쭈	cu zu
+쭈오	cuo zuo
+쭈이	cui zui
+쭌	cun zun
+쭝	cong zong
+쭤	cuo zuo
+쮀	cui zui
+쮀이	cui zui
+쮜	cui zui
+쯔	ce ci ze zi
+쯘	cen zen
+쯩	ceng zeng
+찌	ci zi
+차	ca cha qia
+차오	cao chao qiao
+차우	cao chao
+차이	cai chai
+찬	can chan
+창	cang chang qiang
+채	cai chai
+챠	qia
+챠오	qiao
+챵	qiang
+처	ce che
+처우	chou cou
+천	cen chen
+청	ceng cheng
+체	cei qie
+체이	cei
+첸	qian
+쳔	qian
+쳬	qie
+쳰	qian
+초	chou cou
+초우	chou cou
+총	chong cong
+촤	chua
+촤이	chuai
+촨	chuan cuan
+촹	chuang
+쵀	chuai
+쵸	qiao
+추	chu cu qiu
+추오	chuo cuo
+추이	chui cui
+춘	chun cun
+충	chong cong qiong
+춰	chuo cuo
+춴	quan
+췌	chui cui que
+췌이	chui cui
+취	chui cui qu
+취안	quan
+취에	que
+췬	qun
+츄	qiu
+츙	qiong
+츠	ce che chi ci
+츤	cen chen
+층	ceng cheng
+치	chi ci qi
+치엔	qian
+치우	qiu
+친	qin
+칭	qing
+카	ka
+카오	kao
+카우	kao
+카이	kai
+칸	kan
+캉	kang
+캐	kai
+커	ke
+커우	kou
+컨	ken
+컹	keng
+케	kei
+케이	kei
+코	kou
+코우	kou
+콩	kong
+콰	kua
+콰이	kuai
+콴	kuan
+쾅	kuang
+쾌	kuai
+쿠	ku
+쿠오	kuo
+쿠이	kui
+쿤	kun
+쿵	kong
+쿼	kuo
+퀘	kui
+퀘이	kui
+퀴	kui
+크	ke
+큰	ken
+킁	keng
+타	ta
+타오	tao tiao
+타우	tao
+타이	tai
+탄	tan
+탕	tang
+태	tai
+탸오	tiao
+터	te
+터우	tou
+텅	teng
+테	tei tie
+테이	tei
+텐	tian
+텬	tian
+톄	tie
+톈	tian
+토	tou
+토우	tou
+통	tong
+퇀	tuan
+툐	tiao
+투	tu
+투오	tuo
+투이	tui
+툰	tun
+퉁	tong
+퉈	tuo
+퉤	tui
+퉤이	tui
+튀	tui
+트	te
+틍	teng
+티	ti
+티엔	tian
+팅	ting
+파	fa pa pia
+파오	fiao pao piao
+파우	pao
+파이	pai
+판	fan pan
+팡	fang pang
+패	pai
+퍄	pia
+퍄오	fiao piao
+퍼우	fou pou
+펀	fen pen
+펑	feng peng
+페	fei pei pie
+페이	fei pei
+펜	pian
+편	pian
+폐	pie
+폔	pian
+포	fo fou po pou
+포우	fou pou
+퐁	fong
+표	fiao piao
+푸	fu pu
+풍	fong
+풔	fo po
+픈	fen pen
+픙	feng peng
+피	pi
+피엔	pian
+핀	pin
+핑	ping
+하	fa ha
+하오	fiao hao
+하우	hao
+하이	hai
+한	fan han
+항	fang hang
+해	hai
+햐오	fiao
+허	he
+허우	fou hou
+헌	fen hen
+헝	feng heng
+헤	fei hei
+헤이	fei hei
+호	fo fou hou
+호우	fou hou
+홍	fong hong
+화	hua
+화이	huai
+환	huan
+황	huang
+홰	huai
+효	fiao
+후	fu hu
+후오	huo
+후이	hui
+훈	hun
+훙	fong hong
+훠	fo huo
+훼	hui
+훼이	hui
+휘	hui
+흐	he
+흔	fen hen
+흥	feng heng

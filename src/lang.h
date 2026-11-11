@@ -26,6 +26,7 @@ void hangulInit();
 // Conversion (hanja.cpp): an add-on's convert= kind ("hanja", "" = none) and the absolute path of its convert_dict.
 QString convertKind(const QString &code);
 QString convertDict(const QString &code);
+QString convertMap(const QString &code);          // Hangul -> reading table (kana, pinyin); "" = none
 void hanjaInit();
 
 } // namespace rmpplang
