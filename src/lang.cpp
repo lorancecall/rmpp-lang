@@ -27,6 +27,8 @@
 #include <QtGui/QFont>
 #include <QtGui/QFontDatabase>
 #include <QtGui/QGuiApplication>
+#include <QtGui/QInputMethodEvent>
+#include <QtGui/QKeyEvent>
 #include <QtGui/QTextDocument>
 #include <QtGui/QTextLayout>
 #include <QtGui/QWindow>
@@ -53,37 +55,131 @@ const QString kTraceFlag = kConfDir + QStringLiteral("/trace");
 const QString kProbeOut = QStringLiteral("/tmp/rmpp-lang-probe.txt");
 const QString kFontRoot = QStringLiteral("/home/root/.local/share/fonts/rmpp-lang");
 
-const Language kLanguages[] = {
-    {"ko", "Korean", "한국어", "ko_KR"},
-    {"en", "English", "English", ""},
-    {"ja", "Japanese", "日本語", ""},
-    {"zh", "Chinese", "中文", ""},
-    {"latin", "Typed text (Latin)", "Latin", ""},
+const QString kAddonRoot = QStringLiteral("/home/root/.local/share/rmpp-lang/languages");   // manifests, keymaps, fonts
+const QString kAddonRcc = QStringLiteral("/usr/lib/rmpp-lang/languages");                 // <code>.rcc (layouts)
+
+// A language: built into the core (ko, en, latin) or an add-on described by languages/<code>/language.conf.
+struct Lang {
+    QString code, name, native, input, defaultFont, dir;   // input: layout | compose:<name> | none
+    QList<QChar::Script> scripts;
+    QStringList layouts, known;                           // on-screen layout ids; device families worth offering
+    bool han = false, rtl = false, builtin = false;
+    QHash<QChar, QPair<QString, QString>> keys, altgr;    // US key character -> (plain, shifted)
 };
+QList<Lang> g_langs;
+qint64 g_addonStamp = -2;
 
-// Families already on the device (or downloaded by xochitl) that make sense per language, best first.
-const QHash<QString, QStringList> &knownFamilies() {
-    static const QHash<QString, QStringList> h{
-        {QStringLiteral("ko"), {QStringLiteral("Noto Sans CJK KR"), QStringLiteral("Noto Sans KR")}},
-        {QStringLiteral("ja"), {QStringLiteral("Noto Sans CJK JP"), QStringLiteral("Noto Sans JP")}},
-        {QStringLiteral("zh"), {QStringLiteral("Noto Sans CJK SC"), QStringLiteral("Noto Sans SC"),
-                                QStringLiteral("Noto Sans CJK TC")}},
-        {QStringLiteral("en"), {}},
-        {QStringLiteral("latin"), {QStringLiteral("Noto Sans"), QStringLiteral("EB Garamond"),
-                                   QStringLiteral("Noto Sans Mono")}},
+const Lang *findLang(const QString &code) {
+    for (const Lang &l : g_langs) if (l.code == code) return &l;
+    return nullptr;
+}
+
+QChar::Script scriptByName(const QString &n) {
+    static const QHash<QString, QChar::Script> t{
+        {"Latin", QChar::Script_Latin}, {"Greek", QChar::Script_Greek}, {"Cyrillic", QChar::Script_Cyrillic},
+        {"Armenian", QChar::Script_Armenian}, {"Hebrew", QChar::Script_Hebrew}, {"Arabic", QChar::Script_Arabic},
+        {"Devanagari", QChar::Script_Devanagari}, {"Bengali", QChar::Script_Bengali}, {"Thai", QChar::Script_Thai},
+        {"Lao", QChar::Script_Lao}, {"Georgian", QChar::Script_Georgian}, {"Hangul", QChar::Script_Hangul},
+        {"Hiragana", QChar::Script_Hiragana}, {"Katakana", QChar::Script_Katakana},
+        {"Bopomofo", QChar::Script_Bopomofo}, {"Han", QChar::Script_Han}, {"Ethiopic", QChar::Script_Ethiopic},
+        {"Khmer", QChar::Script_Khmer}, {"Mongolian", QChar::Script_Mongolian}, {"Tibetan", QChar::Script_Tibetan},
     };
-    return h;
+    return t.value(n, QChar::Script_Unknown);
 }
 
-// Scripts whose fallback font a language decides. Han is shared by ko/ja/zh: language order decides.
-QList<QChar::Script> scriptsOf(const QString &code) {
-    if (code == QLatin1String("ko")) return {QChar::Script_Hangul};
-    if (code == QLatin1String("ja")) return {QChar::Script_Hiragana, QChar::Script_Katakana};
-    if (code == QLatin1String("zh")) return {QChar::Script_Bopomofo};
-    return {};
+QHash<QString, QString> readKeyValues(const QString &path) {
+    QHash<QString, QString> kv;
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) return kv;
+    for (const QByteArray &raw : f.readAll().split('\n')) {
+        QString line = QString::fromUtf8(raw).trimmed();
+        if (line.isEmpty() || line.startsWith('#')) continue;
+        const int eq = line.indexOf('=', 1);          // a key may itself be "=" (keymap: "= = ...")
+        if (eq <= 0) continue;
+        QString v = line.mid(eq + 1).trimmed();
+        if (const int hash = v.indexOf(QLatin1String(" #")); hash >= 0) v = v.left(hash).trimmed();
+        kv.insert(line.left(eq).trimmed(), v);
+    }
+    return kv;
 }
-bool usesHan(const QString &code) {
-    return code == QLatin1String("ko") || code == QLatin1String("ja") || code == QLatin1String("zh");
+
+void loadKeymap(Lang &l) {
+    const auto kv = readKeyValues(l.dir + QStringLiteral("/keymap.conf"));
+    for (auto it = kv.cbegin(); it != kv.cend(); ++it) {
+        QString key = it.key();
+        auto *table = &l.keys;
+        if (key.startsWith(QLatin1String("altgr."))) { table = &l.altgr; key = key.mid(6); }
+        if (key.size() != 1) continue;
+        const QStringList v = it.value().split(' ', Qt::SkipEmptyParts);
+        if (v.isEmpty()) continue;
+        table->insert(key.at(0), {v.at(0), v.value(1, v.at(0).toUpper())});
+    }
+}
+
+void loadLanguages() {
+    g_langs.clear();
+    Lang ko;
+    ko.code = "ko"; ko.name = "Korean"; ko.native = QString::fromUtf8("한국어"); ko.input = "compose:hangul";
+    ko.scripts = {QChar::Script_Hangul}; ko.han = true; ko.layouts = {"ko_KR"}; ko.builtin = true;
+    ko.known = {"Noto Sans CJK KR", "Noto Sans KR"};
+    Lang en;
+    en.code = "en"; en.name = "English"; en.native = "English"; en.input = "layout"; en.builtin = true;
+    Lang latin;
+    latin.code = "latin"; latin.name = "Typed text (Latin)"; latin.native = "Latin"; latin.input = "none";
+    latin.builtin = true; latin.known = {"Noto Sans", "EB Garamond", "Noto Sans Mono"};
+    g_langs << ko << en << latin;
+
+    QDir root(kAddonRoot);
+    const QStringList dirs = root.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QString &d : dirs) {
+        const QString dir = root.absoluteFilePath(d);
+        const auto kv = readKeyValues(dir + QStringLiteral("/language.conf"));
+        const QString code = kv.value("code");
+        if (code.isEmpty() || code != d || findLang(code)) {
+            qWarning("[rmpp-lang] add-on %s: no or bad language.conf, skipped", qPrintable(d));
+            continue;
+        }
+        if (kv.value("format", "1").toInt() > 1) {
+            qWarning("[rmpp-lang] add-on %s: manifest format %s is newer than this core", qPrintable(d),
+                     qPrintable(kv.value("format")));
+            continue;
+        }
+        Lang l;
+        l.code = code; l.dir = dir;
+        l.name = kv.value("name", code); l.native = kv.value("native", l.name);
+        l.input = kv.value("input", "none");
+        l.defaultFont = kv.value("font");
+        l.han = kv.value("han") == QLatin1String("1");
+        l.rtl = kv.value("rtl") == QLatin1String("1");
+        l.layouts = kv.value("layouts").split(' ', Qt::SkipEmptyParts);
+        for (const QString &n : kv.value("scripts").split(' ', Qt::SkipEmptyParts))
+            if (QChar::Script s = scriptByName(n); s != QChar::Script_Unknown) l.scripts << s;
+        if (!l.defaultFont.isEmpty()) l.known << l.defaultFont;
+        loadKeymap(l);
+        g_langs << l;
+        qWarning("[rmpp-lang] add-on %s (%s): input=%s layouts=%s keys=%d", qPrintable(code), qPrintable(l.name),
+                 qPrintable(l.input), qPrintable(l.layouts.join(',')), int(l.keys.size() + l.altgr.size()));
+    }
+}
+
+// Stamp of the add-on folder and its manifests (install, upgrade, removal).
+qint64 addonStamp() {
+    QFileInfo r(kAddonRoot);
+    qint64 s = r.exists() ? r.lastModified().toMSecsSinceEpoch() : -1;
+    for (const QFileInfo &fi : QDir(kAddonRoot).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        s = qMax(s, fi.lastModified().toMSecsSinceEpoch());
+        QFileInfo m(fi.absoluteFilePath() + QStringLiteral("/language.conf"));
+        if (m.exists()) s = qMax(s, m.lastModified().toMSecsSinceEpoch());
+    }
+    return s;
+}
+
+// On-screen layouts of add-ons: registered at startup (they must exist when xochitl reads its keyboard list).
+void registerAddonLayouts() {
+    for (const QFileInfo &fi : QDir(kAddonRcc).entryInfoList({QStringLiteral("*.rcc")}, QDir::Files)) {
+        const bool ok = QResource::registerResource(fi.absoluteFilePath());
+        qWarning("[rmpp-lang] layouts %s: %s", qPrintable(fi.fileName()), ok ? "registered" : "FAILED");
+    }
 }
 
 // ---- settings ----
@@ -134,21 +230,29 @@ struct FontFile { QString path; QString lang; QStringList families; qint64 stamp
 QHash<QString, FontFile> g_files;          // by path
 qint64 g_fontStamp = -2;
 
+// Font folders of a language: the user's, then the add-on's own.
+QStringList fontDirs(const Lang &l) {
+    QStringList d{kFontRoot + '/' + l.code};
+    if (!l.dir.isEmpty()) d << l.dir + QStringLiteral("/fonts");
+    return d;
+}
+
 qint64 dirStamp() {
     qint64 s = QFileInfo(kFontRoot).lastModified().toMSecsSinceEpoch();
-    for (const Language &l : kLanguages) {
-        QFileInfo fi(kFontRoot + '/' + QString::fromLatin1(l.code));
-        if (fi.exists()) s = qMax(s, fi.lastModified().toMSecsSinceEpoch());
-    }
+    for (const Lang &l : g_langs)
+        for (const QString &dir : fontDirs(l)) {
+            QFileInfo fi(dir);
+            if (fi.exists()) s = qMax(s, fi.lastModified().toMSecsSinceEpoch());
+        }
     return s;
 }
 
 // Register new or changed font files, drop removed ones.
 void scanFonts() {
     QSet<QString> seen;
-    for (const Language &l : kLanguages) {
-        const QString code = QString::fromLatin1(l.code);
-        QDir d(kFontRoot + '/' + code);
+    for (const Lang &l : g_langs) for (const QString &dirPath : fontDirs(l)) {
+        const QString code = l.code;
+        QDir d(dirPath);
         const auto infos = d.entryInfoList({QStringLiteral("*.ttf"), QStringLiteral("*.otf"), QStringLiteral("*.ttc"),
                                             QStringLiteral("*.TTF"), QStringLiteral("*.OTF")}, QDir::Files);
         for (const QFileInfo &fi : infos) {
@@ -179,13 +283,19 @@ QStringList familiesFor(const QString &code) {
         if (f.lang == code)
             for (const QString &fam : f.families) if (!out.contains(fam)) out << fam;
     const QStringList all = QFontDatabase::families();
-    for (const QString &fam : knownFamilies().value(code))
-        if (all.contains(fam) && !out.contains(fam)) out << fam;
+    if (const Lang *l = findLang(code))
+        for (const QString &fam : l->known)
+            if (all.contains(fam) && !out.contains(fam)) out << fam;
     return out;
 }
 
-// The family set for a language, or "" for the default.
-QString fontOf(const QString &code) { return confValue(QStringLiteral("font.") + code); }
+// The family chosen for a language (lang.conf, else the add-on's default), or "" for the device default.
+QString fontOf(const QString &code) {
+    const QString key = QStringLiteral("font.") + code;
+    if (g_conf.contains(key)) return g_conf.value(key);
+    const Lang *l = findLang(code);
+    return l ? l->defaultFont : QString();
+}
 
 // Latin base font of typed text (experimental): families xochitl uses for document text -> replacement.
 std::mutex g_mapMutex;
@@ -197,14 +307,16 @@ void applyFonts() {
     const QStringList on = enabledCodes();
     // Per-script fallbacks.
     QHash<QChar::Script, QStringList> want;
-    const QList<QChar::Script> managed{QChar::Script_Hangul, QChar::Script_Hiragana, QChar::Script_Katakana,
-                                       QChar::Script_Bopomofo, QChar::Script_Han};
+    static QSet<QChar::Script> managedSet{QChar::Script_Han};    // every script ever set, so it can be cleared
     for (const QString &code : on) {
+        const Lang *l = findLang(code);
         const QString fam = fontOf(code);
-        if (fam.isEmpty()) continue;
-        for (QChar::Script s : scriptsOf(code)) want[s] << fam;
-        if (usesHan(code)) want[QChar::Script_Han] << fam;     // enabled-language order = Han priority
+        if (!l || fam.isEmpty()) continue;
+        for (QChar::Script s : l->scripts) { want[s] << fam; managedSet.insert(s); }
+        if (l->han) want[QChar::Script_Han] << fam;     // enabled-language order = Han priority
     }
+    QList<QChar::Script> managed = managedSet.values();
+    std::sort(managed.begin(), managed.end());
     for (QChar::Script s : managed) {
         if (QFontDatabase::applicationFallbackFontFamilies(s) != want.value(s))
             QFontDatabase::setApplicationFallbackFontFamilies(s, want.value(s));
@@ -229,16 +341,21 @@ void applyFonts() {
 void writeState() {
     QJsonArray langs;
     const QStringList on = enabledCodes();
-    for (const Language &l : kLanguages) {
-        const QString code = QString::fromLatin1(l.code);
+    for (const Lang &l : g_langs) {
+        const QString code = l.code;
         QJsonArray files;
         for (const FontFile &f : std::as_const(g_files))
             if (f.lang == code) files.append(QJsonObject{{"path", f.path}, {"families", QJsonArray::fromStringList(f.families)}});
         langs.append(QJsonObject{
-            {"code", code}, {"name", QString::fromUtf8(l.name)}, {"native", QString::fromUtf8(l.native)},
+            {"code", code}, {"name", l.name}, {"native", l.native},
+            {"addon", !l.builtin},
             {"enabled", code == QLatin1String("latin") || on.contains(code)},
             {"priority", on.indexOf(code)},
-            {"keyboard", QString::fromLatin1(l.vkLayout).isEmpty() ? QJsonValue() : QJsonValue(keyboardEnabled(code))},
+            {"input", l.input},
+            {"layouts", QJsonArray::fromStringList(l.layouts)},
+            {"rtl", l.rtl},
+            {"keyboard", l.input == QLatin1String("none") || code == QLatin1String("en") ? QJsonValue()
+                                                                                         : QJsonValue(keyboardEnabled(code))},
             {"font", fontOf(code)},
             {"families", QJsonArray::fromStringList(familiesFor(code))},
             {"files", files},
@@ -290,34 +407,92 @@ QString docFamily(const QString &family, void *ret) {
 
 // ---- public ----
 
-const Language *languages(int *count) {
-    if (count) *count = int(std::size(kLanguages));
-    return kLanguages;
-}
-bool languageEnabled(const QString &code) { return enabledCodes().contains(code); }
+bool languageEnabled(const QString &code) { return findLang(code) && enabledCodes().contains(code); }
 bool keyboardEnabled(const QString &code) {
-    return languageEnabled(code) && confValue(QStringLiteral("keyboard.") + code, QStringLiteral("1")) != QLatin1String("0");
+    const Lang *l = findLang(code);
+    return l && l->input != QLatin1String("none") && languageEnabled(code)
+        && confValue(QStringLiteral("keyboard.") + code, QStringLiteral("1")) != QLatin1String("0");
+}
+
+// ---- input language for physical keyboards (Ctrl+Space / right Alt cycle) ----
+
+namespace { QString g_input = QStringLiteral("en"); }
+
+QStringList inputCycle() {
+    QStringList out{QStringLiteral("en")};
+    for (const QString &c : enabledCodes())
+        if (c != QLatin1String("en") && keyboardEnabled(c)) out << c;
+    return out;
+}
+QString currentInput() {
+    if (!inputCycle().contains(g_input)) g_input = QStringLiteral("en");
+    return g_input;
+}
+void setInput(const QString &code) {
+    const QString want = inputCycle().contains(code) ? code : QStringLiteral("en");
+    if (want != g_input) qWarning("[rmpp-lang] input language: %s", qPrintable(want));
+    g_input = want;
+}
+void cycleInput() {
+    const QStringList c = inputCycle();
+    setInput(c.at((c.indexOf(currentInput()) + 1) % c.size()));
+}
+QString screenLayoutFor(const QString &code) {
+    const Lang *l = findLang(code);
+    return l && !l->layouts.isEmpty() ? l->layouts.first() : QString();
+}
+QString inputForScreenLayout(const QString &layout) {
+    for (const Lang &l : g_langs)
+        if (l.layouts.contains(layout) && keyboardEnabled(l.code)) return l.code;
+    return QStringLiteral("en");
+}
+QString inputLabel() {
+    const QString c = currentInput();
+    if (c == QLatin1String("ko")) return QString::fromUtf8("한");
+    return c.left(2).toUpper();
+}
+
+// Physical keys of an add-on with a keymap: the character for a key event, or "" to leave it alone.
+QString mapKey(int qtKey, Qt::KeyboardModifiers mods, bool altgr) {
+    const Lang *l = findLang(currentInput());
+    if (!l || (l->keys.isEmpty() && l->altgr.isEmpty())) return {};
+    // Key on a US keyboard, unshifted.
+    static const QHash<int, QChar> shiftedToBase{
+        {Qt::Key_BraceLeft, '['}, {Qt::Key_BraceRight, ']'}, {Qt::Key_Colon, ';'}, {Qt::Key_QuoteDbl, '\''},
+        {Qt::Key_Less, ','}, {Qt::Key_Greater, '.'}, {Qt::Key_Question, '/'}, {Qt::Key_Underscore, '-'},
+        {Qt::Key_Plus, '='}, {Qt::Key_Bar, '\\'}, {Qt::Key_AsciiTilde, '`'}, {Qt::Key_Exclam, '1'},
+        {Qt::Key_At, '2'}, {Qt::Key_NumberSign, '3'}, {Qt::Key_Dollar, '4'}, {Qt::Key_Percent, '5'},
+        {Qt::Key_AsciiCircum, '6'}, {Qt::Key_Ampersand, '7'}, {Qt::Key_Asterisk, '8'}, {Qt::Key_ParenLeft, '9'},
+        {Qt::Key_ParenRight, '0'}};
+    QChar base;
+    if (qtKey >= Qt::Key_A && qtKey <= Qt::Key_Z) base = QChar(char16_t(u'a' + (qtKey - Qt::Key_A)));
+    else if (shiftedToBase.contains(qtKey)) base = shiftedToBase.value(qtKey);
+    else if (qtKey > 0x20 && qtKey < 0x7f) base = QChar(char16_t(qtKey));
+    else return {};
+    const auto &table = altgr ? l->altgr : l->keys;
+    auto it = table.find(base);
+    if (it == table.end()) return {};
+    return (mods & Qt::ShiftModifier) ? it->second : it->first;
 }
 
 } // namespace rmpplang
 
 // Interposed Qt symbols (C linkage with the C++ mangled names; the preload wins over libQt6Gui).
+// QFont::setFamily / QFont(family) / QTextDocument::setDefaultFont are only traced: replacing "reMarkable Sans" there
+// also changed xochitl's whole UI (it sets the application font from its own code). The typed-text font is replaced
+// in QTextLayout::setFont called from xochitl's code, which is how it lays out text on the canvas.
 extern "C" {
 void _ZN5QFont9setFamilyERK7QString(QFont *self, const QString &family) {
     static auto real = reinterpret_cast<rmpplang::SetFamilyFn>(dlsym(RTLD_NEXT, "_ZN5QFont9setFamilyERK7QString"));
     void *ret = __builtin_return_address(0);
     if (rmpplang::g_trace.load(std::memory_order_relaxed)) rmpplang::trace("QFont::setFamily", family, ret);
-    const QString to = rmpplang::docFamily(family, ret);
-    if (to.isEmpty()) { real(self, family); return; }
-    self->setFamilies({to, family});
+    real(self, family);
 }
 void _ZN5QFontC1ERK7QStringiib(QFont *self, const QString &family, int size, int weight, bool italic) {
     static auto real = reinterpret_cast<rmpplang::CtorFn>(dlsym(RTLD_NEXT, "_ZN5QFontC1ERK7QStringiib"));
     void *ret = __builtin_return_address(0);
     if (rmpplang::g_trace.load(std::memory_order_relaxed)) rmpplang::trace("QFont(family)", family, ret);
     real(self, family, size, weight, italic);
-    const QString to = rmpplang::docFamily(family, ret);
-    if (!to.isEmpty()) self->setFamilies({to, family});
 }
 void _ZN13QTextDocument14setDefaultFontERK5QFont(QTextDocument *self, const QFont &font) {
     static auto real = reinterpret_cast<rmpplang::SetDefFontFn>(dlsym(RTLD_NEXT, "_ZN13QTextDocument14setDefaultFontERK5QFont"));
@@ -388,6 +563,43 @@ void probe() {
     qWarning("[rmpp-lang] probe written to %s", qPrintable(kProbeOut));
 }
 
+// ---- physical keyboards for add-ons with a keymap.conf ----
+// Korean (hangul.cpp) handles the toggle keys and Korean itself; this filter types the add-on's characters while
+// its language is the input language.
+class KeymapFilter : public QObject {
+public:
+    using QObject::QObject;
+protected:
+    bool eventFilter(QObject *obj, QEvent *ev) override {
+        if (obj != QGuiApplication::focusObject()) return false;
+        if (ev->type() == QEvent::KeyPress) {
+            auto *k = static_cast<QKeyEvent *>(ev);
+            const auto mods = k->modifiers() & ~(Qt::ShiftModifier | Qt::KeypadModifier);
+            const bool altgr = (mods == (Qt::ControlModifier | Qt::AltModifier)) || (mods == Qt::GroupSwitchModifier);
+            if (mods != Qt::NoModifier && !altgr) return false;
+            const QString out = mapKey(k->key(), k->modifiers(), altgr);
+            if (out.isEmpty()) return false;
+            QInputMethodEvent im;
+            im.setCommitString(out);
+            QCoreApplication::sendEvent(obj, &im);
+            return true;
+        }
+        if (ev->type() == QEvent::InputMethod) {
+            // Type Folio keys can arrive as one-letter input-method commits (see hangul.cpp).
+            auto *e = static_cast<QInputMethodEvent *>(ev);
+            const QString c = e->commitString();
+            if (c.size() != 1 || !e->preeditString().isEmpty() || e->replacementLength() != 0) return false;
+            const char16_t u = c.at(0).unicode();
+            if (u > 0x7f) return false;
+            const bool upper = (u >= u'A' && u <= u'Z');
+            const int key = upper ? Qt::Key_A + (u - u'A') : (u >= u'a' && u <= u'z') ? Qt::Key_A + (u - u'a') : int(u);
+            const QString out = mapKey(key, upper ? Qt::ShiftModifier : Qt::NoModifier, false);
+            if (!out.isEmpty()) e->setCommitString(out);
+        }
+        return false;
+    }
+};
+
 // ---- Settings > Languages ----
 
 QQmlPropertyMap *g_map = nullptr;
@@ -396,15 +608,20 @@ void publish() {
     if (!g_map) return;
     QJsonArray arr;
     const QStringList on = enabledCodes();
-    for (const Language &l : kLanguages) {
-        const QString code = QString::fromLatin1(l.code);
+    for (const Lang &l : g_langs) {
+        const QString code = l.code;
         QStringList fams = familiesFor(code);
         arr.append(QJsonObject{
-            {"code", code}, {"name", QString::fromUtf8(l.name)}, {"native", QString::fromUtf8(l.native)},
+            {"code", code}, {"name", l.name}, {"native", l.native},
+            {"addon", !l.builtin},
             {"enabled", code == QLatin1String("latin") || on.contains(code)},
             {"fixed", code == QLatin1String("en") || code == QLatin1String("latin")},
-            {"hasKeyboard", *l.vkLayout != 0},
+            {"priority", on.indexOf(code)},
+            {"hasKeyboard", l.input != QLatin1String("none") && code != QLatin1String("en")},
             {"keyboard", keyboardEnabled(code)},
+            {"input", l.input},
+            {"layouts", QJsonArray::fromStringList(l.layouts)},
+            {"rtl", l.rtl},
             {"font", fontOf(code)},
             {"families", QJsonArray::fromStringList(fams)},
             {"fontDir", kFontRoot + '/' + code},
@@ -508,6 +725,11 @@ void tryInject() {
 void poll() {
     const QFileInfo ci(kConf);
     const qint64 cs = ci.exists() ? ci.lastModified().toMSecsSinceEpoch() : -1;
+    if (const qint64 as = addonStamp(); as != g_addonStamp) {
+        g_addonStamp = as;
+        loadLanguages();
+        g_fontStamp = -2;       // fonts of new add-ons
+    }
     const qint64 fs = dirStamp();
     if (cs != g_confStamp || fs != g_fontStamp) {
         g_confStamp = cs;
@@ -535,8 +757,12 @@ void init() {
     QObject::connect(g_map, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
         if (key == QLatin1String("command")) command(v.toString().section('#', 0, 0));
     });
+    registerAddonLayouts();
     loadConf();
-    hangulInit();
+    loadLanguages();
+    auto *keys = new KeymapFilter(app);
+    app->installEventFilter(keys);
+    hangulInit();             // installed after: sees events first, handles Korean and the language toggle
     auto *t = new QTimer(app);
     QObject::connect(t, &QTimer::timeout, app, [] { poll(); });
     t->start(1500);

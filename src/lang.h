@@ -1,24 +1,25 @@
-// rmpp-lang: shared declarations between the language core (lang.cpp) and the keyboards (hangul.cpp).
+// rmpp-lang: shared declarations between the language core (lang.cpp) and the Korean keyboard (hangul.cpp).
 #pragma once
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 
 namespace rmpplang {
 
-// Language codes shared with rmpp-hwr: ko, en, ja, zh, latin ("latin" = typed Latin text in general).
-struct Language {
-    const char *code;
-    const char *name;         // English name shown in Settings
-    const char *native;       // name in the language itself
-    const char *vkLayout;     // on-screen keyboard layout added by rmpp-lang ("" = none yet)
-};
-const Language *languages(int *count);
-
-// Current settings (from /home/root/.config/rmpp-lang/lang.conf).
+// Languages: ko, en, latin are built in; others are add-ons (/home/root/.local/share/rmpp-lang/languages/<code>/).
 bool languageEnabled(const QString &code);
-bool keyboardEnabled(const QString &code);
+bool keyboardEnabled(const QString &code);     // enabled, has an input method, keyboard.<code> not 0
 
-// Korean keyboard (hangul.cpp): started once at startup, keyboardEnabled("ko") is checked live.
+// Input language of physical keyboards: Ctrl+Space / right Alt cycle through "en" + the enabled languages with
+// a keyboard, in priority order. With only Korean on this is the Korean/English toggle.
+QStringList inputCycle();
+QString currentInput();
+void setInput(const QString &code);
+void cycleInput();
+QString inputLabel();                            // "한", "EN", "RU", ...
+QString screenLayoutFor(const QString &code);    // on-screen layout id of a language ("" = none)
+QString inputForScreenLayout(const QString &layout);
+
+// Korean keyboard (hangul.cpp): started once at startup.
 void hangulInit();
 
 } // namespace rmpplang

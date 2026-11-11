@@ -94,8 +94,8 @@ QString render(const Parsed &p) {
 }
 
 // Input language for physical keyboards, shared with the on-screen keyboard and the indicator.
-bool g_korean = false;
-void setKorean(bool on, const char *why);
+bool g_korean = false;              // == (rmpplang::currentInput() == "ko")
+void applyInput(const char *why);
 
 class HangulFilter : public QObject {
 public:
@@ -268,18 +268,20 @@ private:
 
         // Ctrl+Space: toggle, and swallow it so no space is typed.
         if (k->key() == Qt::Key_Space && (k->modifiers() & ~Qt::KeypadModifier) == Qt::ControlModifier) {
-            if (!rmpplang::keyboardEnabled(QStringLiteral("ko"))) return false;
+            if (rmpplang::inputCycle().size() < 2) return false;
             if (!k->isAutoRepeat() && k->timestamp() != lastToggleTs) {
                 lastToggleTs = k->timestamp();
-                setKorean(!g_korean, "key");
+                rmpplang::cycleInput();
+                applyInput("key");
                 reset();
             }
             return true;
         }
         if (isToggleKey(k)) {
-            if (!rmpplang::keyboardEnabled(QStringLiteral("ko"))) return false;
+            if (rmpplang::inputCycle().size() < 2) return false;
             if (atFocus && !k->isAutoRepeat()) {
-                setKorean(!g_korean, "key");
+                rmpplang::cycleInput();
+                applyInput("key");
                 reset();
             }
             return false;
@@ -443,17 +445,28 @@ QObject *findVirtualKeyboard() {
     return panel ? panel->property("virtualKeyboard").value<QObject *>() : nullptr;
 }
 
-void setKorean(bool on, const char *why) {
-    if (g_korean != on) qWarning("[hangul] input language: %s (%s)", on ? "Korean" : "English", why);
+// The input language changed (key, indicator, globe key, settings): Korean composition, indicator, on-screen keyboard.
+void applyInput(const char *why) {
+    const QString cur = rmpplang::currentInput();
+    const bool on = (cur == QLatin1String("ko"));
+    if (g_korean != on) qWarning("[hangul] Korean input: %s (%s)", on ? "on" : "off", why);
     g_korean = on;
-    if (g_state) g_state->insert(QStringLiteral("korean"), on);
-    // Keep the on-screen keyboard on the same language (only if Korean is one of its enabled languages).
+    if (g_state) {
+        g_state->insert(QStringLiteral("korean"), on);
+        g_state->insert(QStringLiteral("label"), rmpplang::inputLabel());
+        g_state->insert(QStringLiteral("enabled"), rmpplang::inputCycle().size() > 1);
+    }
+    // Keep the on-screen keyboard on the same language (only if that layout is one of its enabled languages).
     if (qstrcmp(why, "screen") == 0) return;
     if (QObject *vk = findVirtualKeyboard()) {
-        const QString cur = vk->property("language").toString();
-        const QString want = on ? QStringLiteral("ko_KR") : g_latinLanguage;
+        const QString vkCur = vk->property("language").toString();
+        QString want = rmpplang::screenLayoutFor(cur);
+        if (want.isEmpty()) want = g_latinLanguage;
         const QStringList langs = vk->property("languages").toStringList();
-        if (cur != want && (langs.isEmpty() || langs.contains(want)) && vk->setProperty("language", want))
+        // A layout that is not turned on in Language & keyboard cannot be shown: stay on the Latin layout then
+        // (setting it anyway left the on-screen keyboard without keys).
+        if (!langs.contains(want)) want = g_latinLanguage;
+        if (vkCur != want && langs.contains(want) && vk->setProperty("language", want))
             g_lastVkLanguage = want;
     }
 }
@@ -465,8 +478,10 @@ void followScreenLanguage() {
     const QString lang = vk->property("language").toString();
     if (lang.isEmpty() || lang == g_lastVkLanguage) return;
     g_lastVkLanguage = lang;
-    if (lang != QLatin1String("ko_KR")) g_latinLanguage = lang;
-    setKorean(lang == QLatin1String("ko_KR"), "screen");
+    const QString code = rmpplang::inputForScreenLayout(lang);
+    if (code == QLatin1String("en")) g_latinLanguage = lang;
+    rmpplang::setInput(code);
+    applyInput("screen");
 }
 
 // "한" / "EN" indicator on the bottom format bar, left of its close button; tap to switch.
@@ -474,7 +489,7 @@ const char *kIndicatorQml = R"QML(
 import QtQuick
 Rectangle {
     width: 76; height: 56; radius: 10
-    color: hangul.korean ? "white" : "black"
+    color: hangul.label !== "EN" ? "white" : "black"
     border.color: "white"; border.width: 2
     anchors.right: parent.right; anchors.rightMargin: 112
     anchors.verticalCenter: parent.verticalCenter
@@ -482,8 +497,8 @@ Rectangle {
     visible: !!hangul.enabled
     Text {
         anchors.centerIn: parent
-        text: hangul.korean ? "한" : "EN"
-        color: hangul.korean ? "black" : "white"
+        text: hangul.label || "EN"
+        color: hangul.label !== "EN" ? "black" : "white"
         font.pixelSize: 30; font.bold: true
     }
     MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: hangul.command = "toggle#" + Date.now() }
@@ -525,16 +540,18 @@ void init() {
     g_state = new QQmlPropertyMap(app);
     g_state->insert(QStringLiteral("korean"), false);
     g_state->insert(QStringLiteral("command"), QString());
-    g_state->insert(QStringLiteral("enabled"), rmpplang::keyboardEnabled(QStringLiteral("ko")));
+    g_state->insert(QStringLiteral("enabled"), false);
+    g_state->insert(QStringLiteral("label"), QStringLiteral("EN"));
     QObject::connect(g_state, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
-        if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) setKorean(!g_korean, "indicator");
+        if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) { rmpplang::cycleInput(); applyInput("indicator"); }
     });
     auto *timer = new QTimer(filter);
     QObject::connect(timer, &QTimer::timeout, filter, [] {
-        // Korean keyboard turned off in Settings > Languages: back to English, indicator hidden.
-        const bool on = rmpplang::keyboardEnabled(QStringLiteral("ko"));
-        if (g_state->value(QStringLiteral("enabled")).toBool() != on) g_state->insert(QStringLiteral("enabled"), on);
-        if (!on && g_korean) setKorean(false, "settings");
+        // A language or keyboard turned off in Settings > Languages: currentInput() falls back to English.
+        if (g_korean != (rmpplang::currentInput() == QLatin1String("ko"))
+            || g_state->value(QStringLiteral("label")).toString() != rmpplang::inputLabel()
+            || g_state->value(QStringLiteral("enabled")).toBool() != (rmpplang::inputCycle().size() > 1))
+            applyInput("settings");
         syncExternalKeyboard();
         followScreenLanguage();
         syncIndicator();

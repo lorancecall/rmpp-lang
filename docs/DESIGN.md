@@ -71,26 +71,55 @@ before the platform (fontconfig) fallbacks whenever the requested font lacks a g
 ("reMarkable Sans", "reMarkable Serif Small") have no Hangul, kana or Han, so for those scripts the fallback
 decides what the user sees, everywhere: UI, file names, keyboard, typed text.
 
-| Language | Scripts set |
+| Language | Scripts set (from the manifest; Korean built in) |
 |---|---|
 | ko | Hangul, + Han |
-| ja | Hiragana, Katakana, + Han |
-| zh | Bopomofo, + Han |
+| ja (add-on) | Hiragana, Katakana, + Han |
+| zh (add-on) | Bopomofo, + Han |
+| ru (add-on) | Cyrillic (no font set: reMarkable Sans covers it) |
 
 Han (CJK ideographs) is shared: the fonts of the enabled languages are listed in `languages` order, so Hanja in
 Korean text follows the Korean font when `ko` comes first, and Japanese users can put `ja` first
 (`rmpp-lang lang first ja`). Font files are registered with `QFontDatabase::addApplicationFont` (no fontconfig
 cache rebuild, no restart).
 
-FINDINGS_FALLBACK
+Measured on the tablet (OS 3.29.1, Qt 6.10.3):
+
+- Setting a fallback at runtime changes the UI at once (file names, Settings, the keyboard): installing
+  NanumMyeongjo for `ko` turned "필기테스트" in My files into Myeongjo within the 1.5 s poll, no restart.
+- Typed text on the canvas: new and edited text blocks use the fallback (Hangul, Hanja and kana in the chosen
+  fonts). Text blocks of a document opened before the change, and blocks not edited since, kept their previous
+  look in the test, also after a restart; xochitl seems to keep the laid-out glyphs of existing blocks. To be
+  checked further (does editing a block, or a page re-render after zooming, refresh it?). The Settings page says
+  "applies to new text" until this is understood.
+- Qt's font cache is per thread and xochitl lays out canvas text in another thread, so the add-on applies the
+  settings once at startup (before that thread exists) and then on every change; a font change can need the
+  document to be reopened.
 
 ### Base font of typed Latin text (experimental)
 
-FINDINGS_LATIN
+xochitl draws typed text with "reMarkable Sans" (its UI uses the same family, "reMarkable Serif Small" for titles).
+A per-script fallback cannot change Latin (the family has those glyphs), so rmpp-lang interposes Qt functions
+(LD_PRELOAD wins over libQt6Gui):
+
+- First try: `QFont::setFamily` / `QFont(family, ...)` called from xochitl's code -> the **whole UI** turned to
+  the replacement (xochitl sets the application font from its own code). Not usable.
+- Now: only `QTextLayout::setFont` called from xochitl's code (the canvas text layout; QML text goes through
+  QtQuick and is not touched). New typed text showed in EB Garamond, the UI stayed reMarkable Sans.
+- `latin.replaces` lists the families replaced (default `reMarkable Sans`); the replacement is put first with the
+  original second, so missing glyphs still come from xochitl's font and the fallbacks.
+- Experimental and off by default (`font.latin` empty). It depends on xochitl internals (which function lays out
+  canvas text) and has to be re-checked on every OS update.
 
 ### Sync and PDF export
 
-FINDINGS_EXPORT
+- **Sync**: documents store the text and its paragraph styles, not fonts. Other devices and the reMarkable apps
+  show their own fonts; nothing rmpp-lang changes is uploaded. A missing font on the tablet only changes how this
+  tablet draws the text.
+- **PDF export** (made on the tablet by xochitl): expected to use the same layout and therefore embed the chosen
+  fonts (Hangul in the Korean font, Latin in `font.latin` when set). Not tested yet; check that the exported PDF
+  embeds the font subset and that line breaks match the screen. The font's license must allow embedding (OFL does).
+- **Handwriting conversion and search** work on text, not glyphs: unaffected.
 
 ## Keyboards
 
@@ -132,12 +161,107 @@ here, so this ranking is weak and should be checked by hand):
 Suggested order after Korean: Cyrillic (ru, uk) and Turkish as plain layouts, Type Folio AltGr letters, then
 Vietnamese (composition), then Japanese/Chinese IMEs.
 
+## Language add-ons
+
+The core package `rmpp-lang` contains the add-on library, the Settings page, the command, **Korean** (keyboard and
+font) and the two entries every tablet has: `en` and `latin` (the typed-text font). Every other language is an
+add-on: a folder in this repository, packaged as `rmpp-lang-<code>` (depends on `rmpp-lang`), chosen at install
+time. Adding a language = adding a folder; the core is not rebuilt.
+
+### In the repository
+
+```
+languages/<code>/
+  language.conf            # manifest (required)
+  keyboards/<layout>/keyboard_layout.json   # on-screen layouts, xochitl format (optional)
+  keymap.conf              # physical-keyboard map (optional)
+  fonts/                   # font files shipped as they are (optional; OFL or similar)
+  fonts.conf               # fonts downloaded at package build time (optional)
+  LICENSE-fonts            # license text of the fonts (required when fonts/ or fonts.conf is present)
+```
+
+`<code>`: lowercase ISO 639-1 (`ja`, `zh`, `ru`, `uk`, `tr`, `vi`, `he`, ...), a region suffix only when needed
+(`zh-hant`). Reserved for the core: `ko`, `en`, `latin`.
+
+`language.conf` (key=value, `#` comments, UTF-8; read by the core, the package build and the installer):
+
+```ini
+format=1                   # manifest format version
+code=ru
+name=Russian               # English name
+native=Русский             # name in the language
+summary_en=Russian keyboard (ЙЦУКЕН) on screen and on Type Folio, Bluetooth and USB keyboards
+summary_ko=러시아어 키보드(ЙЦУКЕН): 화면 키보드와 Type Folio·블루투스·USB 키보드
+version=0.1.0              # add-on version (package pkgver)
+min_core=0.1.0             # oldest rmpp-lang core that understands this add-on
+scripts=Cyrillic           # Qt script names whose fallback font this language decides (see below)
+han=0                      # 1 = also decides Han characters, in language order (ja, zh)
+input=layout               # layout | compose:<name> (built into the core: hangul, later telex) | none (fonts only)
+layouts=ru_RU              # on-screen layout ids = folder names under keyboards/ ("" = none)
+rtl=0                      # 1 = right-to-left (the Settings page warns that editing is not checked yet)
+font=                      # default family ("" = device default); the user can pick another
+```
+
+Script names: `Latin Greek Cyrillic Armenian Hebrew Arabic Devanagari Bengali Thai Lao Georgian Hangul Hiragana
+Katakana Bopomofo Han Ethiopic Khmer Mongolian Tibetan` (`QChar::Script_<name>`; unknown names are ignored).
+
+`keymap.conf` (physical keyboards, positions of a US keyboard):
+
+```ini
+# key = character [shifted]          letters a-z, digits, and ` - = [ ] \ ; ' , . /
+q = й Й
+w = ц Ц
+[ = х Х
+# AltGr / right Alt layer (only for languages whose toggle is not right Alt)
+altgr.a = ą Ą
+```
+
+`fonts.conf` (one font per line: URL, SHA-256, file name):
+
+```
+https://github.com/notofonts/noto-cjk/raw/<commit>/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf  <sha256>  NotoSansCJKjp-Regular.otf
+```
+
+### On the tablet
+
+| What | Path | Why there |
+|---|---|---|
+| Manifest, keymap, fonts | `/home/root/.local/share/rmpp-lang/languages/<code>/` (`language.conf`, `keymap.conf`, `fonts/*`) | Package files in /home survive OS updates. |
+| On-screen layouts | `/usr/lib/rmpp-lang/languages/<code>.rcc` (copied by postinstall / postupgrade / reenable from `/home/root/.vellum/share/rmpp-lang-<code>/<code>.rcc`) | xochitl starts before /home is mounted; layouts must be registered at startup. The package build makes it with `rcc` from `keyboards/` (prefix `/`, files `misc/keyboards/<layout>/keyboard_layout.json`). |
+
+The core registers every `/usr/lib/rmpp-lang/languages/*.rcc` at startup, and lists every
+`/home/root/.local/share/rmpp-lang/languages/*/language.conf` (polled with the other files, so an add-on installed
+or removed shows up in Settings > Languages within seconds; a new on-screen layout needs one xochitl restart,
+which the package does anyway). Fonts in an add-on's `fonts/` are registered like user fonts; user fonts keep
+their own folder (`/home/root/.local/share/fonts/rmpp-lang/<code>/`). A newly installed add-on is turned on
+(appended to `languages=`) by its postinstall: `rmpp-lang lang on <code>`; removing it leaves `lang.conf` alone
+(the core ignores codes without a manifest).
+
+Physical keyboards: Ctrl+Space / right Alt cycle through the enabled languages that have `input` other than
+`none` (with only Korean on, this is today's Korean/English toggle); the indicator shows the language's code.
+
+### Packaging (rmpp-packages CI, proposal)
+
+For each `languages/<code>/` of a tagged rmpp-lang release: `pkgname=rmpp-lang-<code>`, `pkgver=` the manifest
+`version`, `depends="rmpp-lang>=<min_core>"`, `pkgdesc=` `summary_en`, license GPL-3.0-only plus the fonts'
+license. Files: the folder minus `keyboards/` and `fonts.conf`, plus downloaded fonts (checked against SHA-256) and
+`<code>.rcc`. postinstall/postupgrade/reenable copy the rcc to `/usr/lib/rmpp-lang/languages/`, run
+`rmpp-lang lang on <code>` (postinstall only) and restart xochitl if a layout was added; preremove deletes the rcc.
+
 ## Settings > Languages
 
-A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tailscale 1002) placed after
-xochitl's own language row. Per language: on/off, keyboard (Korean), font (cycles through the language's
-installed families and the device's, with a sample line in that font), the folder to drop fonts into. The page
-talks to the library through a `QQmlPropertyMap` (`languages` JSON, `command` string); no map key is named `model`.
+A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tailscale 1002).
+
+- **List**: one row per installed language (Korean, English, typed text, then the add-ons) with a one-line
+  summary ("Keyboard on · Font: NanumMyeongjo"). Tapping a row opens its page.
+- **Language page**: on/off, keyboard (with where to turn on the on-screen layout), font, a sample line in that
+  font, priority ("Move up": shared Han characters use the first language's font), the folder for the user's fonts.
+- **Font popup**: the families for the language (the user's, the add-on's, the device's, "Default"), each shown
+  in its own face; one tap picks it.
+
+Drill-down pages follow xochitl's own Settings (Wi-Fi network details); a popup is used only for the short font
+choice, where seeing the faces side by side helps. The page talks to the library through a `QQmlPropertyMap`
+(`languages` JSON, `command` string); no map key is named `model`.
 
 ## Commands
 

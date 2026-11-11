@@ -5,7 +5,9 @@ CONF_DIR=/home/root/.config/rmpp-lang
 CONF=$CONF_DIR/lang.conf
 STATE=$CONF_DIR/state.json
 FONTS=/home/root/.local/share/fonts/rmpp-lang
-CODES="ko en ja zh latin"
+ADDONS=/home/root/.local/share/rmpp-lang/languages
+# Built-in languages, then the installed add-ons (one folder with a language.conf each).
+CODES="ko en latin$(for d in "$ADDONS"/*/language.conf; do [ -f "$d" ] && printf ' %s' "$(basename "$(dirname "$d")")"; done)"
 
 usage() {
   cat <<'USAGE'
@@ -18,7 +20,7 @@ Usage: rmpp-lang COMMAND
   font use FAMILY --lang CODE         "" = back to the default
   font rm FILE_NAME --lang CODE
   probe [trace on|off]                write the fonts in use to /tmp/rmpp-lang-probe.txt
-Codes: ko en ja zh latin (latin = typed Latin text, experimental)
+Codes: ko en latin + installed add-ons (latin = typed Latin text, experimental)
 USAGE
   exit "${1:-0}"
 }
@@ -54,7 +56,7 @@ case "$cmd" in
   lang)
     sub=$1; code=$2
     case "$sub" in
-      list) echo "enabled (priority order): $(languages)"; echo "codes: $CODES" ;;
+      list) echo "enabled (priority order): $(languages)"; echo "installed: $CODES" ;;
       on)  valid_code "$code"; l=$(languages); echo ",$l," | grep -q ",$code," || set_key languages "$l,$code"; echo "on: $code" ;;
       off) valid_code "$code"; [ "$code" = en ] && die "en stays on"
            set_key languages "$(echo ",$(languages)," | sed "s/,$code,/,/; s/^,//; s/,$//")"; echo "off: $code" ;;
