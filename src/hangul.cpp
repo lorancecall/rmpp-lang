@@ -270,6 +270,8 @@ protected:
         case QEvent::KeyRelease:
             onKeyRelease(obj, static_cast<QKeyEvent *>(ev));
             break;
+        case QEvent::InputMethodQuery:
+            return onQuery(obj, static_cast<QInputMethodQueryEvent *>(ev));
         case QEvent::ShortcutOverride:
             if (debug) qWarning("[hangul] shortcutOverride key=0x%x obj=%s", static_cast<QKeyEvent *>(ev)->key(), obj->metaObject()->className());
             break;
@@ -430,6 +432,26 @@ private:
             }
         }
         return j;
+    }
+
+    // ---- no automatic Shift at the start of a sentence for Korean, Japanese, Chinese (developer's request) ----
+    // The on-screen keyboard turns Shift on at the start of text (ㄱ -> ㄲ in Hangul). The field answers the
+    // keyboard's hints query; add Qt::ImhNoAutoUppercase while the input language has no letter case.
+    bool inQuery = false;
+    static bool caseless() {
+        const QString code = rmpplang::currentInput();
+        const QString kind = rmpplang::convertKind(code);
+        return rmpplang::inputMethod(code) == QLatin1String("compose:hangul") || kind == QLatin1String("kana")
+            || kind == QLatin1String("pinyin") || kind == QLatin1String("hanja");
+    }
+    bool onQuery(QObject *obj, QInputMethodQueryEvent *q) {
+        if (inQuery || !(q->queries() & Qt::ImHints) || !caseless()) return false;
+        inQuery = true;
+        obj->event(q);                          // let the field answer first
+        inQuery = false;
+        const int hints = q->value(Qt::ImHints).toInt();
+        q->setValue(Qt::ImHints, hints | Qt::ImhNoAutoUppercase);
+        return true;
     }
 
     // ---- left Alt: cycle the jamo just typed through its old letters ----
