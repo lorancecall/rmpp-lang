@@ -15,6 +15,7 @@
 #include <QtGui/QInputMethod>
 #include <QtCore/QDateTime>
 #include <QtCore/QFile>
+#include <QtCore/QPointer>
 #include <QtCore/QTimer>
 #include <QtCore/QMetaMethod>
 #include <QtGui/QWindow>
@@ -159,6 +160,28 @@ bool composesHangul() { return rmpplang::inputMethod(rmpplang::currentInput()) =
 void applyInput(const char *why);
 void noteJamo(char16_t j);          // a jamo was typed (swipe.cpp part below)
 
+// Old syllables are conjoining jamo (2-3 characters drawn as one). When the engine replaces them while typing,
+// xochitl redraws only the region it computes for the changed characters, and parts of the stacked syllable stay
+// blank (a reopened notebook draws them right). Ask the text item for a full redraw shortly after such a commit.
+bool hasConjoining(const QString &s) {
+    for (QChar c : s) {
+        const char16_t u = c.unicode();
+        if ((u >= 0x1100 && u <= 0x11FF) || (u >= 0xA960 && u <= 0xA97F) || (u >= 0xD7B0 && u <= 0xD7FF)
+            || u == 0x302E || u == 0x302F) return true;
+    }
+    return false;
+}
+void redrawLater(QObject *obj, const QString &before, const QString &after) {
+    if (!hasConjoining(before) && !hasConjoining(after)) return;
+    QPointer<QObject> o(obj);
+    QTimer::singleShot(60, [o] {
+        auto *item = qobject_cast<QQuickItem *>(o.data());
+        if (!item) return;
+        item->update();
+        if (item->window()) item->window()->update();
+    });
+}
+
 class HangulFilter : public QObject {
 public:
     using QObject::QObject;
@@ -189,6 +212,7 @@ public:
         ownSend = true;
         QCoreApplication::sendEvent(obj, &im);
         ownSend = false;
+        redrawLater(obj, QString(), out);
         owner = obj;
         lastCursor = cursorOf(obj);
     }
@@ -270,9 +294,11 @@ private:
             if (commit.isEmpty() && e->replacementStart() == -1 && e->replacementLength() == 1
                 && stillComposing(obj) && block.size() > 1) {
                 const int prev = int(lastOut.size());
+                const QString before = lastOut;
                 block.pop_back();
                 lastOut = render(parse(block));
                 e->setCommitString(lastOut, -prev, prev);
+                redrawLater(obj, before, lastOut);
                 lastEvent = e; lastSet = lastOut;
                 return false;
             }
@@ -291,8 +317,10 @@ private:
             const int prevLen = int(lastOut.size());
             if (p.ok) {
                 block = grown;
+                const QString before = lastOut;
                 lastOut = render(p);
                 e->setCommitString(lastOut, -prevLen, prevLen);
+                redrawLater(obj, before, lastOut);
                 finish(obj, int(lastOut.size()) - prevLen);
                 lastEvent = e; lastSet = lastOut;
                 return false;
@@ -305,9 +333,11 @@ private:
                 Parsed pp = parse(prev), pn = parse(next);
                 if (pp.ok && pn.ok) {
                     QString out = render(pp) + render(pn);
+                    const QString before = lastOut;
                     block = next;
                     lastOut = render(pn);
                     e->setCommitString(out, -prevLen, prevLen);
+                    redrawLater(obj, before, out);
                     finish(obj, int(out.size()) - prevLen);
                     lastEvent = e; lastSet = out;
                     return false;
@@ -316,6 +346,7 @@ private:
         }
         block.assign(1, j);
         lastOut = QString(QChar(j));
+        redrawLater(obj, QString(), lastOut);
         finish(obj, 1);
         return false;
     }
@@ -405,10 +436,12 @@ private:
             return false;
         }
         const int prev = int(lastOut.size());
+        const QString before = lastOut;
         block.pop_back();
         lastOut = render(parse(block));
         QInputMethodEvent im;
         im.setCommitString(lastOut, -prev, prev);
+        redrawLater(obj, before, lastOut);
         ownSend = true;
         QCoreApplication::sendEvent(obj, &im);
         ownSend = false;
@@ -705,6 +738,7 @@ void insertOld(const QString &s) {
     QInputMethodEvent im;
     im.setCommitString(s);
     QCoreApplication::sendEvent(obj, &im);
+    redrawLater(obj, QString(), s);      // 방점 change how the syllable before them is drawn
 }
 
 void syncIndicator() {
