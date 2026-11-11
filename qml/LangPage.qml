@@ -46,6 +46,11 @@ Rectangle {
     function usedFamily(e) { return e.font || e.defaultFamily || "reMarkable Sans"; }
     function fontLabel(e) { return e.font && e.font !== e.defaultFamily ? e.font : usedFamily(e) + " · default"; }
     function sampleFont(e, fam) { return fam || usedFamily(e); }
+    // The add-on's sample line, or its plain version where that font cannot render it (core: rendersSample).
+    function sampleText(e, fam) {
+        const f = sampleFont(e, fam);
+        return (e.samples && e.samples[f]) || e.sample || "";
+    }
 
     x: payloadLoaderRef.x
     y: payloadLoaderRef.y
@@ -236,7 +241,7 @@ Rectangle {
             }
             Text {
                 visible: !!detail.e.enabled
-                text: detail.e.sample || ""
+                text: page.sampleText(detail.e, detail.e.font)
                 font.family: page.sampleFont(detail.e, detail.e.font)
                 font.pixelSize: 40
                 elide: Text.ElideRight
@@ -312,7 +317,7 @@ Rectangle {
                             }
                             Text {
                                 width: parent.width
-                                text: (page.entry && page.entry.sample) || "Aa"
+                                text: page.sampleText(page.entry || {}, modelData) || "Aa"
                                 color: chosen ? "white" : "black"
                                 font.family: page.sampleFont(page.entry || {}, modelData)
                                 font.pixelSize: 34

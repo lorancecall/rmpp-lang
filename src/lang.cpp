@@ -28,6 +28,8 @@
 #include <QtCore/QTimer>
 #include <QtGui/QFont>
 #include <QtGui/QFontDatabase>
+#include <QtGui/QFontMetricsF>
+#include <QtGui/QRawFont>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QInputMethodEvent>
 #include <QtGui/QKeyEvent>
@@ -64,7 +66,8 @@ const QString kAddonRcc = QStringLiteral("/usr/lib/rmpp-lang/languages");       
 // A language: built into the core (ko, en, latin) or an add-on described by languages/<code>/language.conf.
 struct Lang {
     QString code, name, native, input, defaultFont, dir;   // input: layout | compose:<name> | none
-    QString label, keyboardName, sample;                  // indicator text, layout name, Settings sample line
+    QString label, keyboardName, sample, samplePlain;     // indicator text, layout name, Settings sample line
+                                                          // (+ the line for fonts that cannot render it)
     QString convert, convertDict;                         // conversion kind (hanja) and its dictionary file
     QList<QChar::Script> scripts;
     QStringList layouts, known;                           // on-screen layout ids; device families worth offering
@@ -160,6 +163,7 @@ void loadLanguages() {
         l.label = kv.value("label");
         l.keyboardName = kv.value("keyboard_name");
         l.sample = kv.value("sample");
+        l.samplePlain = kv.value("sample_plain");
         l.convert = kv.value("convert");
         l.convertDict = kv.value("convert_dict");
         if (!l.defaultFont.isEmpty()) l.known << l.defaultFont;
@@ -679,6 +683,45 @@ protected:
 
 // ---- Settings > Languages ----
 
+// Can `family` show `text` as written? Every character needs a glyph in that font (no fallback), and runs of
+// conjoining Hangul jamo (old Hangul) must compose: in a font that composes them, the vowels and final consonants
+// add no width to the leading consonants (they are placed inside the syllable); a font without the jamo features
+// (the OS's Noto Sans KR) sets each jamo side by side.
+bool rendersSample(const QString &family, const QString &text) {
+    static QHash<QString, bool> cache;
+    const QString key = family + QChar(0) + text;
+    if (auto it = cache.constFind(key); it != cache.constEnd()) return *it;
+    QFont f(family);
+    f.setPixelSize(40);
+    const QRawFont raw = QRawFont::fromFont(f);
+    bool ok = raw.isValid() && raw.familyName().compare(family, Qt::CaseInsensitive) == 0;
+    const auto jamo = [](char32_t c) {
+        return (c >= 0x1100 && c <= 0x11FF) || (c >= 0xA960 && c <= 0xA97F) || (c >= 0xD7B0 && c <= 0xD7FF);
+    };
+    const auto lead = [](char32_t c) { return (c >= 0x1100 && c <= 0x115F) || (c >= 0xA960 && c <= 0xA97F); };
+    const QList<uint> cps = text.toUcs4();
+    for (uint c : cps)
+        if (ok && !QChar::isSpace(c) && !raw.supportsCharacter(c)) ok = false;
+    if (ok) {
+        const QFontMetricsF fm(f);
+        for (qsizetype i = 0; ok && i < cps.size();) {
+            if (!jamo(cps[i])) { ++i; continue; }
+            QString run, leads;
+            for (; i < cps.size() && jamo(cps[i]); ++i) {
+                const QString c = QString::fromUcs4(reinterpret_cast<const char32_t *>(&cps[i]), 1);
+                run += c;
+                if (lead(cps[i])) leads += c;
+            }
+            const qreal wRun = fm.horizontalAdvance(run), wLeads = fm.horizontalAdvance(leads);
+            qWarning("[rmpp-lang] sample check %s: jamo run %.1f px, leading consonants %.1f px", qPrintable(family),
+                     wRun, wLeads);
+            if (leads.isEmpty() || wRun > wLeads * 1.15) ok = false;
+        }
+    }
+    cache.insert(key, ok);
+    return ok;
+}
+
 QQmlPropertyMap *g_map = nullptr;
 
 void publish() {
@@ -692,6 +735,11 @@ void publish() {
         QStringList fams = familiesFor(code);
         fams.removeAll(defaultFamily);
         fams.prepend(defaultFamily);
+        // Sample line per family: the add-on's `sample`, or `sample_plain` where the font cannot render it.
+        QJsonObject samples;
+        if (!l.samplePlain.isEmpty())
+            for (const QString &fam : fams)
+                if (!rendersSample(fam, l.sample)) samples.insert(fam, l.samplePlain);
         arr.append(QJsonObject{
             {"code", code}, {"name", l.name}, {"native", l.native},
             {"addon", !l.builtin},
@@ -704,6 +752,7 @@ void publish() {
             {"layouts", QJsonArray::fromStringList(l.layouts)},
             {"keyboardName", l.keyboardName},
             {"sample", l.sample},
+            {"samples", samples},
             {"rtl", l.rtl},
             {"font", confValue(QStringLiteral("font.") + code)},     // the user's choice, "" = default
             {"defaultFamily", defaultFamily},
