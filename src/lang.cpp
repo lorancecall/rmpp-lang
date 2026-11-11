@@ -71,6 +71,10 @@ struct Lang {
     QString convert, convertDict, convertMap;             // conversion kind (hanja, kana, pinyin), dictionary, reading table
     bool keyboardDefault = true;                          // keyboard on until the user changes it (keyboard_default=)
     QString requires;                                     // language whose layout this one types on (ja, zh: ko)
+    QString convertSimplify;                              // Traditional -> Simplified table for candidates (zh hanja)
+    QHash<QString, QString> kv;                           // the manifest, for input methods (key@method=)
+    QStringList methods;                                  // input methods the user can choose (methods=), first = default
+    QString method;                                       // the chosen one ("" = the add-on has no choice)
     QList<QChar::Script> scripts;
     QStringList layouts, known;                           // on-screen layout ids; device families worth offering
     bool han = false, rtl = false, builtin = false;
@@ -126,6 +130,32 @@ void loadKeymap(Lang &l) {
     }
 }
 
+// Input method of a language with a choice (zh: hangul | pinyin | hanja): the manifest's key@method values
+// override the plain keys. The choice is method.<code> in lang.conf.
+QString confValue(const QString &key, const QString &def = QString());
+void applyMethod(Lang &l) {
+    if (l.methods.isEmpty()) return;
+    const QString want = confValue(QStringLiteral("method.") + l.code);
+    l.method = l.methods.contains(want) ? want : l.methods.first();
+    const auto get = [&](const char *key, const char *def = "") {
+        const QString k = QString::fromLatin1(key);
+        const auto it = l.kv.constFind(k + QLatin1Char('@') + l.method);
+        return it != l.kv.constEnd() ? *it : l.kv.value(k, QString::fromLatin1(def));
+    };
+    l.input = get("input", "none");
+    l.layouts = get("layouts").split(' ', Qt::SkipEmptyParts);
+    l.keyboardName = get("keyboard_name");
+    l.label = get("label");
+    l.convert = get("convert");
+    l.convertDict = get("convert_dict");
+    l.convertMap = get("convert_map");
+    l.convertSimplify = get("convert_simplify");
+    l.requires = get("requires");
+}
+void applyMethods() {
+    for (Lang &l : g_langs) applyMethod(l);
+}
+
 void loadLanguages() {
     g_langs.clear();
     // The core knows no language but English and the typed-text font; everything else is an add-on.
@@ -171,6 +201,9 @@ void loadLanguages() {
         l.convertMap = kv.value("convert_map");
         l.keyboardDefault = kv.value("keyboard_default", "1") != QLatin1String("0");
         l.requires = kv.value("requires");
+        l.kv = kv;
+        l.methods = kv.value("methods").split(' ', Qt::SkipEmptyParts);
+        applyMethod(l);
         if (!l.defaultFont.isEmpty()) l.known << l.defaultFont;
         for (const QString &f : kv.value("families").split(',', Qt::SkipEmptyParts))
             if (!l.known.contains(f.trimmed())) l.known << f.trimmed();
@@ -206,7 +239,7 @@ void registerAddonLayouts() {
 QHash<QString, QString> g_conf;
 qint64 g_confStamp = -2;
 
-QString confValue(const QString &key, const QString &def = QString()) { return g_conf.value(key, def); }
+QString confValue(const QString &key, const QString &def) { return g_conf.value(key, def); }
 
 QStringList enabledCodes() {
     QStringList out;
@@ -473,16 +506,26 @@ QString convertKind(const QString &code) {
     return l && !l->convertDict.isEmpty() ? l->convert : QString();
 }
 
-QString convertDict(const QString &code) {
+// A file of an add-on: "dict/x.txt" in its own folder, "@ko/dict/hanja.txt" in another add-on's.
+QString addonFile(const Lang *l, const QString &rel) {
+    if (!l || rel.isEmpty() || rel.contains(QLatin1String(".."))) return {};
+    if (rel.startsWith(QLatin1Char('@'))) {
+        const Lang *other = findLang(rel.mid(1).section(QLatin1Char('/'), 0, 0));
+        return other && !other->dir.isEmpty() ? other->dir + QLatin1Char('/') + rel.section(QLatin1Char('/'), 1) : QString();
+    }
+    return l->dir + QLatin1Char('/') + rel;
+}
+
+QString convertDict(const QString &code) { return addonFile(findLang(code), findLang(code) ? findLang(code)->convertDict : QString()); }
+
+QString convertSimplify(const QString &code) {
     const Lang *l = findLang(code);
-    if (!l || l->convertDict.isEmpty() || l->convertDict.contains(QLatin1String(".."))) return {};
-    return l->dir + QLatin1Char('/') + l->convertDict;
+    return l ? addonFile(l, l->convertSimplify) : QString();
 }
 
 QString convertMap(const QString &code) {
     const Lang *l = findLang(code);
-    if (!l || l->convertMap.isEmpty() || l->convertMap.contains(QLatin1String(".."))) return {};
-    return l->dir + QLatin1Char('/') + l->convertMap;
+    return l ? addonFile(l, l->convertMap) : QString();
 }
 
 bool languageEnabled(const QString &code) { return findLang(code) && enabledCodes().contains(code); }
@@ -767,6 +810,13 @@ void publish() {
             {"input", l.input},
             {"layouts", QJsonArray::fromStringList(l.layouts)},
             {"keyboardName", l.keyboardName},
+            {"methods", QJsonArray::fromStringList(l.methods)},
+            {"method", l.method},
+            {"methodNames", [&] {
+                 QJsonObject o;
+                 for (const QString &m : l.methods) o.insert(m, l.kv.value(QStringLiteral("method_name.") + m, m));
+                 return o;
+             }()},
             {"sample", l.sample},
             {"samples", samples},
             {"rtl", l.rtl},
@@ -782,6 +832,7 @@ void publish() {
 }
 
 void applyAll(const char *why) {
+    applyMethods();
     scanFonts();
     applyFonts();
     writeState();
@@ -800,6 +851,8 @@ void command(const QString &cmd) {
         g_conf.insert(QStringLiteral("keyboard.") + code, arg == QLatin1String("1") ? QStringLiteral("1") : QStringLiteral("0"));
     } else if (verb == QLatin1String("font")) {
         g_conf.insert(QStringLiteral("font.") + code, arg);
+    } else if (verb == QLatin1String("method")) {
+        g_conf.insert(QStringLiteral("method.") + code, arg);
     } else if (verb == QLatin1String("up") || verb == QLatin1String("down")) {
         // Move one place among the languages in use; English has no font of its own and is skipped.
         QStringList on = enabledCodes();

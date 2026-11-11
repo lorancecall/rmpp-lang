@@ -53,7 +53,8 @@ installer again (or `vellum reenable`).
   the cursor (or the selected word) into Hanja: pick from the candidates (1-9 on a physical keyboard).
 - **Japanese and Chinese in Hangul:** turn on the keyboard of Japanese or Chinese in Settings > Languages, switch
   to it (日 / 中), type the sound in Hangul and tap **変** / **汉** (or Hanja / F9): 니혼고 -> 日本語,
-  다베마스 -> 食べます, 베이징 -> 北京, 니하오 -> 你好.
+  다베마스 -> 食べます, 베이징 -> 北京, 니하오 -> 你好. Chinese can also be typed in pinyin (zhongguo, Space
+  converts) or by Korean Hanja readings (중국 -> 中国 / 中國): Settings > Languages > Chinese > Input.
 - **Indicator:** a button on the format bar above the keyboard shows the current language (EN, 한, RU, ...); tap
   it to switch.
 - **External keyboards:** while a Bluetooth or USB keyboard is connected, the on-screen keys fold away and the

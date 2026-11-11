@@ -215,6 +215,21 @@ Hanja (button 変 for ja, 汉 for zh; Hanja key / F9).
 - **Later**: phrase conversion (several words at once), a Traditional Chinese option, learning the user's picks,
   live kana while typing.
 
+### Input methods to choose from (zh)
+
+A language can offer several input methods (`methods=`, first = default); the user picks one in Settings >
+Languages > (language) > Input, or with `rmpp-lang method CODE NAME` (`method.<code>` in lang.conf). The manifest's
+`key@method=` values override the plain keys for that method (input, layouts, requires, keyboard_name, label,
+convert, convert_dict, convert_map, convert_simplify). zh offers:
+
+- `hangul` (default): Mandarin sounds in Hangul (중궈 -> 中国), as above.
+- `pinyin`: letters on the Latin layout, the standard Chinese input: the letters before the cursor are the pinyin
+  (no tones), candidates are the exact words then words starting with it (prediction), by frequency. Space
+  converts, and picks the first candidate while the bar is open; 汉 / Hanja key / F9 also convert.
+- `hanja`: Korean Hanja readings (중국 -> 中国 / 中國) for those who know Hanja through Sino-Korean readings:
+  the ko add-on's word dictionary (`convert_dict@hanja=@ko/dict/hanja.txt`, `@code/` = another add-on's folder),
+  each word in Simplified (OpenCC, `dict/t2s.txt`) and Traditional.
+
 ### Next keyboards
 
 On-screen layouts xochitl 3.29 already ships (locale ids in the binary): bg_BG, ca_ES, cs_CZ, da_DK, de_AT,
@@ -287,7 +302,10 @@ sample_plain=              # shown instead for fonts that cannot render `sample`
                            # Hangul jamo); ko: Hunminjeongeum in old Hangul, plain = the same line in modern Korean
 convert=                   # conversion offered by the core: hanja | kana | pinyin ("" = none); ko: hanja
 convert_dict=              # its dictionary, relative to the add-on folder; ko: dict/hanja.txt
-convert_map=               # Hangul -> reading table for kana / pinyin; ja: dict/ja.map
+convert_map=               # Hangul -> reading table for kana / pinyin; ja: dict/ja.map ("" with pinyin = letters)
+convert_simplify=          # Traditional -> Simplified table for the candidates (zh hanja method)
+methods=                   # input methods the user can choose, first = default (zh: hangul pinyin hanja)
+method_name.<m>=           # how Settings names method <m>; key@<m>= overrides key for that method
 requires=                  # add-on whose on-screen layout this one uses; ja, zh: ko
 keyboard_default=1         # 0 = keyboard off until the user turns it on (ja, zh)
 ```

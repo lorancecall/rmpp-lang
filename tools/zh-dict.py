@@ -209,7 +209,14 @@ def main():
             line = f"{r}\t{t}\t\t{int(-nw)}"
             if not excluded(line):
                 f.write(line + "\n")
-    print(f"{out_dir}: zh.map {len(m)} spellings, zh.txt {len(rows)} entries")
+    with open(f"{out_dir}/t2s.txt", "w", encoding="utf-8", newline="\n") as f:   # for the "hanja" method
+        f.write("# Traditional -> Simplified, from OpenCC TSCharacters / TSPhrases (Apache-2.0)\n")
+        for k, v in sorted(cm.items()):
+            if k != v:
+                f.write(f"{k}\t{v}\n")
+        for k, v in sorted(pm.items()):
+            f.write(f"{k}\t{v}\n")
+    print(f"{out_dir}: zh.map {len(m)} spellings, zh.txt {len(rows)} entries, t2s.txt {len(cm) + len(pm)}")
 
 
 if __name__ == "__main__":

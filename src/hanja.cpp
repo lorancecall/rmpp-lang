@@ -3,7 +3,11 @@
 //   convert=kana    (ja) Japanese typed in Hangul: syllables -> kana by the add-on's reading table (convert_map),
 //                   then kana -> words (SKK dictionary, okurigana endings added by the core).
 //   convert=pinyin  (zh) Chinese typed in Hangul as Koreans spell Mandarin: one or two syllables -> a pinyin
-//                   syllable by the reading table, then pinyin -> words ranked by frequency.
+//                   syllable by the reading table, then pinyin -> words ranked by frequency. Without a reading
+//                   table (zh method "pinyin") the Latin letters before the cursor are the pinyin: exact words
+//                   and words starting with it; Space converts, and picks the first candidate while the bar is open.
+//   zh method "hanja": Sino-Korean readings (중국) through the ko add-on's Hanja dictionary, shown in Simplified
+//                   (convert_simplify, OpenCC) and Traditional.
 //
 // Trigger: the button on the keyboard's format bar (漢 / 変 / 汉), or the Hanja / F9 key of a physical keyboard.
 // The selection, or the Hangul syllables before the cursor, are looked up: candidates for the longest run first,
@@ -99,6 +103,20 @@ public:
         }
         return out;
     }
+    // Entries whose reading starts with prefix (looks at most `scan` lines), in file order.
+    QList<Entry> withPrefix(const QString &prefix, int scan) const {
+        QList<Entry> out;
+        if (!m_data) return out;
+        const QByteArray key = prefix.toUtf8();
+        for (qint64 p = lowerBound(key); p < m_size && scan-- > 0; p = lineEnd(p) + 1) {
+            if (m_size - p < key.size() || std::memcmp(m_data + p, key.constData(), size_t(key.size())) != 0) break;
+            const qint64 e = lineEnd(p);
+            const QStringList f = QString::fromUtf8(reinterpret_cast<const char *>(m_data + p), int(e - p))
+                                      .split(QLatin1Char('\t'));
+            if (f.size() >= 2) out.append({f.at(1), f.value(2), f.value(3).toLongLong()});
+        }
+        return out;
+    }
     // Does any reading start with prefix?
     bool hasPrefix(const QString &prefix) const {
         if (!m_data) return false;
@@ -168,6 +186,33 @@ struct ReadingMap {
     }
 };
 ReadingMap g_readings;
+
+// Traditional -> Simplified (OpenCC tables: phrases, then characters), for the zh "hanja" method.
+struct Simplifier {
+    QString path;
+    QHash<QString, QString> phrases;
+    QHash<QChar, QChar> chars;
+    void load(const QString &p) {
+        if (p == path) return;
+        path = p; phrases.clear(); chars.clear();
+        QFile f(p);
+        if (!f.open(QIODevice::ReadOnly)) return;
+        while (!f.atEnd()) {
+            const QString line = QString::fromUtf8(f.readLine()).trimmed();
+            if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) continue;
+            const QString t = line.section(QLatin1Char('\t'), 0, 0), sv = line.section(QLatin1Char('\t'), 1, 1);
+            if (t.size() == 1 && sv.size() == 1) chars.insert(t.at(0), sv.at(0));
+            else phrases.insert(t, sv);
+        }
+    }
+    QString apply(const QString &t) const {
+        if (const auto it = phrases.constFind(t); it != phrases.constEnd()) return *it;
+        QString out = t;
+        for (QChar &c : out) c = chars.value(c, c);
+        return out;
+    }
+};
+Simplifier g_simplify;
 
 // SKK's okurigana key letter for the first kana of a word ending (書く: かk).
 QChar okuriLetter(QChar k) {
@@ -252,14 +297,19 @@ QString toKatakana(const QString &s) {
 }
 
 // The conversion of the current input language: kind ("" = none), dictionary and reading table.
-struct Conv { QString kind, dict, map; };
+struct Conv {
+    QString kind, dict, map, simplify;
+    bool latin() const { return kind == QLatin1String("pinyin") && map.isEmpty(); }   // pinyin typed in letters
+};
 Conv currentConv() {
     const QString code = rmpplang::currentInput();
-    Conv c{rmpplang::convertKind(code), rmpplang::convertDict(code), rmpplang::convertMap(code)};
-    if (c.kind == QLatin1String("hanja")) return c;
-    if ((c.kind == QLatin1String("kana") || c.kind == QLatin1String("pinyin")) && !c.map.isEmpty()) return c;
+    Conv c{rmpplang::convertKind(code), rmpplang::convertDict(code), rmpplang::convertMap(code),
+           rmpplang::convertSimplify(code)};
+    if (c.kind == QLatin1String("hanja") || c.kind == QLatin1String("pinyin")) return c;
+    if (c.kind == QLatin1String("kana") && !c.map.isEmpty()) return c;
     return {};
 }
+bool isPinyinLetter(QChar c) { return (c >= QLatin1Char('a') && c <= QLatin1Char('z')) || (c >= QLatin1Char('A') && c <= QLatin1Char('Z')); }
 QString currentDict() { return currentConv().dict; }
 
 QString buttonLabel(const QString &kind) {
@@ -287,7 +337,30 @@ void closeBar() {
 
 // Candidates for one Hangul run (all of it is replaced).
 QList<Entry> candidatesFor(const Conv &conv, const QString &run, bool withKana) {
-    if (conv.kind == QLatin1String("hanja")) return g_dict.lookup(run);
+    if (conv.kind == QLatin1String("hanja")) {
+        if (conv.simplify.isEmpty()) return g_dict.lookup(run);
+        g_simplify.load(conv.simplify);
+        QList<Entry> out;
+        QSet<QString> seen;
+        for (const Entry &e : g_dict.lookup(run))
+            for (const QString &w : {g_simplify.apply(e.word), e.word})
+                if (!seen.contains(w)) { seen.insert(w); out.append({w, e.note, 0}); }
+        return out;
+    }
+    if (conv.latin()) {   // pinyin letters: the exact words, then (for the whole run) words that start with it
+        const QString key = run.toLower();
+        QList<Entry> out = g_dict.lookup(key);
+        if (withKana) {
+            QList<Entry> more = g_dict.withPrefix(key, 3000);
+            std::stable_sort(more.begin(), more.end(), [](const Entry &a, const Entry &b) { return a.weight > b.weight; });
+            QSet<QString> seen;
+            for (const Entry &e : std::as_const(out)) seen.insert(e.word);
+            for (const Entry &e : std::as_const(more))
+                if (!seen.contains(e.word) && out.size() < 120) { seen.insert(e.word); out.append(e); }
+        }
+        std::stable_sort(out.begin(), out.end(), [&](const Entry &a, const Entry &b) { return a.weight > b.weight; });
+        return out;
+    }
     const bool kana = conv.kind == QLatin1String("kana");
     QList<Entry> out;
     QSet<QString> seen;
@@ -354,7 +427,9 @@ bool convert() {
             return false;
         }
         int n = 0;
-        while (n < kMaxRun && cur - n - 1 >= 0 && isSyllable(text.at(cur - n - 1))) ++n;
+        const auto inRun = conv.latin() ? isPinyinLetter : isSyllable;
+        const int maxRun = conv.latin() ? 40 : kMaxRun;
+        while (n < maxRun && cur - n - 1 >= 0 && inRun(text.at(cur - n - 1))) ++n;
         for (int len = n; len >= 1 && cands.size() < kMaxCands; --len)
             for (const Entry &e : candidatesFor(conv, text.mid(cur - len, len), len == n)) {
                 cands.append({e.word, e.note, len});
@@ -394,6 +469,15 @@ void turnPage(int delta) {
     if (p >= 0 && p < pages) g_map->insert(QStringLiteral("page"), p);
 }
 
+// Pinyin typed in letters: Space picks the first candidate while the bar is open, else converts the letters
+// before the cursor (a space is typed when there are none).
+bool spaceConverts() {
+    const Conv conv = currentConv();
+    if (!conv.latin()) return false;
+    if (!g_cands.isEmpty()) { pick(pageStart()); return true; }
+    return convert();
+}
+
 // ---- physical keys ----
 
 class HanjaFilter : public QObject {
@@ -402,8 +486,15 @@ public:
 
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override {
+        if (ev->type() == QEvent::InputMethod && obj == QGuiApplication::focusObject()) {
+            auto *im = static_cast<QInputMethodEvent *>(ev);
+            if (im->commitString() == QLatin1String(" ") && im->preeditString().isEmpty() && im->replacementLength() == 0
+                && spaceConverts()) return true;
+            return false;
+        }
         if (ev->type() != QEvent::KeyPress || obj != QGuiApplication::focusObject()) return false;
         auto *k = static_cast<QKeyEvent *>(ev);
+        if (k->key() == Qt::Key_Space && k->modifiers() == Qt::NoModifier && spaceConverts()) return true;
         if (k->key() == Qt::Key_Hangul_Hanja || (k->key() == Qt::Key_F9 && k->modifiers() == Qt::NoModifier)) {
             if (currentDict().isEmpty()) return false;
             if (!k->isAutoRepeat()) convert();
