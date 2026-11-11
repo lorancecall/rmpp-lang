@@ -225,6 +225,25 @@ Rectangle {
                 }
             }
             ArkControls.Panel {
+                // Languages with a choice of input methods (zh: Hangul / pinyin / Hanja readings): "Change" goes
+                // to the next one.
+                readonly property var ms: detail.e.methods || []
+                visible: !!detail.e.enabled && ms.length > 1
+                label: "Input: " + ((detail.e.methodNames || {})[detail.e.method] || detail.e.method || "")
+                description: "Ways to type " + (detail.e.name || "") + ": "
+                    + ms.map(function (m) { return (detail.e.methodNames || {})[m] || m; }).join(" · ")
+                Layout.fillWidth: true
+                action: ArkControls.Button {
+                    text: "Change"
+                    type: ArkTokens.Button.secondary
+                    onClicked: {
+                        const ms = detail.e.methods || [];
+                        const next = ms[(ms.indexOf(detail.e.method) + 1) % ms.length];
+                        page.send("method:" + detail.e.code + ":" + next);
+                    }
+                }
+            }
+            ArkControls.Panel {
                 visible: !!detail.e.enabled
                 label: "Font: " + page.fontLabel(detail.e)
                 description: detail.e.code === "latin"

@@ -185,7 +185,50 @@ Adding a keyboard:
   kept), rebuilt with `tools/hanja-dict.py`: `reading:hanja:meaning`, sorted by the reading's UTF-8 bytes; within a
   reading, entries with a meaning first (韓國 before 寒國). 303k entries, 6.4 MB; the core memory-maps it and
   binary-searches, so xochitl's memory does not grow.
-- **Later**: learn the user's picks (move them first), Hanja -> Hangul back, the same bar for ja/zh IMEs.
+- **Later**: learn the user's picks (move them first), Hanja -> Hangul back.
+
+### Japanese and Chinese typed in Hangul
+
+Hangul was used from the start to write the readings of Chinese characters (Dongguk Jeongun, 1448) and the
+Mandarin of its day (Hongmu Jeongun Yeokhun, 1455). The ja and zh add-ons use it the same way: the user types the
+sound in Hangul on the Korean keyboard and converts the Hangul before the cursor with the same candidate bar as
+Hanja (button 変 for ja, 汉 for zh; Hanja key / F9).
+
+- **Add-on**: `input=compose:hangul`, `layouts=ko_KR`, `requires=ko` (the layout comes from the ko add-on),
+  `keyboard_default=0` (off until turned on in Settings, so a fonts-only user is not given a Hangul keyboard),
+  `convert=kana|pinyin`, `convert_dict=`, `convert_map=`. Indicator labels 日 / 中.
+- **Reading table** (`convert_map`, `syllable<TAB>reading reading ...`): one or two Hangul syllables -> readings,
+  strict one first. `^syllable` lines give the order at the start of a word.
+  - ja (`tools/ja-dict.py`): one syllable -> kana. Plain ㄱ ㄷ ㅈ try both voicings (가 = が / か; at the start of a
+    word か first, as Korean spelling writes it), long vowels are optional (도 = と, とう), ㄴ ㅇ ㅁ finals = ん,
+    ㅅ ㄱ ㄷ ㅂ finals = っ, 쟈/자 = じゃ, 쓰/츠 = つ, particles 와 = は, 에 = へ, 오 = を.
+  - zh (`tools/zh-dict.py`): Korean spelling of Mandarin (외래어 표기법) and common variants, one or two syllables
+    per pinyin syllable (중 = zhong, 궈 = guo, 베이 or 베 = bei, 즈 or 지 = zhi); tones are not typed.
+- **Search**: all readings of the run whose prefixes exist in the dictionary (binary search on the sorted file),
+  at most 48 readings / 4000 steps. ja adds SKK okurigana (stem key `かk` + the typed ending, up to 4 kana).
+- **Order**: zh by frequency (rime essay). ja has no frequencies: the readings' words in turns (first of each,
+  then second of each), then the kana of readings that matched, okurigana forms, plain hiragana and katakana.
+  Checked on a PC: 도쿄 -> 東京 (2nd), 가이샤 -> 会社, 간지 -> 漢字, 지칸 -> 時間 (2nd), 니혼고 -> 日本語,
+  다베마스 -> 食べます, 아리가토 -> 有難う, 중궈 -> 中国, 베이징 -> 北京, 니하오 -> 你好, 워아이니 -> 我爱你.
+- **Dictionaries**: ja `dict/ja.txt` from SKK-JISYO.L (GPL-2.0-or-later, 237k entries, 6.6 MB); zh `dict/zh.txt`
+  from rime luna_pinyin + essay (LGPL-3.0), converted to Simplified with OpenCC (Apache-2.0), 348k entries, 8 MB.
+- **Later**: phrase conversion (several words at once), a Traditional Chinese option, learning the user's picks,
+  live kana while typing.
+
+### Input methods to choose from (zh)
+
+A language can offer several input methods (`methods=`, first = default); the user picks one in Settings >
+Languages > (language) > Input, or with `rmpp-lang method CODE NAME` (`method.<code>` in lang.conf). The manifest's
+`key@method=` values override the plain keys for that method (input, layouts, requires, keyboard_name, label,
+convert, convert_dict, convert_map, convert_simplify). zh offers:
+
+- `hangul` (default): Mandarin sounds in Hangul (중궈 -> 中国), as above.
+- `pinyin`: letters on the Latin layout, the standard Chinese input: the letters before the cursor are the pinyin
+  (no tones), candidates are the exact words then words starting with it (prediction), by frequency. Space
+  converts, and picks the first candidate while the bar is open; 汉 / Hanja key / F9 also convert.
+- `hanja`: Korean Hanja readings (중국 -> 中国 / 中國) for those who know Hanja through Sino-Korean readings:
+  the ko add-on's word dictionary (`convert_dict@hanja=@ko/dict/hanja.txt`, `@code/` = another add-on's folder),
+  each word in Simplified (OpenCC, `dict/t2s.txt`) and Traditional.
 
 ### Next keyboards
 
@@ -257,8 +300,15 @@ keyboard_name=ЙЦУКЕН       # how Settings names the layout ("" = the layou
 sample=Здравствуйте, хорошего дня · 123   # Settings sample line in the chosen font
 sample_plain=              # shown instead for fonts that cannot render `sample` (missing glyphs, uncomposed old
                            # Hangul jamo); ko: Hunminjeongeum in old Hangul, plain = the same line in modern Korean
-convert=                   # conversion offered by the core: hanja ("" = none); ko: hanja
+convert=                   # conversion offered by the core: hanja | kana | pinyin ("" = none); ko: hanja
 convert_dict=              # its dictionary, relative to the add-on folder; ko: dict/hanja.txt
+convert_map=               # Hangul -> reading table for kana / pinyin; ja: dict/ja.map ("" with pinyin = letters)
+convert_simplify=          # Traditional -> Simplified table for the candidates (zh hanja method)
+methods=                   # input methods the user can choose, first = default (zh: hangul pinyin hanja)
+method_name.<m>=           # how Settings names method <m>; key@<m>= overrides key for that method
+requires=                  # add-ons this one needs, comma list (ja, zh: ko, whose layout they type on); the
+                           # packages depend on rmpp-lang-<code> and the installer selects them too
+keyboard_default=1         # 0 = keyboard off until the user turns it on (ja, zh)
 ```
 
 Script names: `Latin Greek Cyrillic Armenian Hebrew Arabic Devanagari Bengali Thai Lao Georgian Hangul Hiragana
