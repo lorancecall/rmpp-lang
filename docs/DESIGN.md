@@ -320,3 +320,7 @@ No migration: rmpp-korean is removed and rmpp-lang installed fresh; release orde
   synthetic bold.
 - Variable fonts (the device's Noto Sans KR is one) work as families; weights are not offered separately.
 - Google Fonts by name is limited to `ofl/` (SIL OFL) families on purpose.
+- Chinese (left to whoever builds the Chinese add-on): the OS ships only Noto Sans SC, so Traditional characters
+  are drawn with Simplified glyph shapes. A Traditional variant (`zh-hant` add-on with Noto Sans TC / CJK TC via
+  `fonts.conf`) and a sample line whose characters differ between SC and TC (e.g. 骨 直 角 説 for/說) would make the
+  difference visible in Settings.
