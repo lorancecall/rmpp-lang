@@ -215,6 +215,18 @@ Hanja (button 変 for ja, 汉 for zh; Hanja key / F9).
 - **Later**: phrase conversion (several words at once), a Traditional Chinese option, learning the user's picks,
   live kana while typing.
 
+### Old Hangul (ko input method "old")
+
+Settings > Languages > Korean > Input > Old Hangul (indicator 옛). The 옛 button on the format bar opens rows of
+letters: archaic letters ㆍ ㅿ ㆆ ㆁ ㅸ ㅱ ㆄ ㆅ ㅹ, initial clusters ᄢ ᄣ ᄧ ᄩ ᄠ ᄡ ᄭ ᄯ ᄲ ᄶ, the sibilants used for
+Mandarin in Hongmu Jeongun Yeokhun ᄼ ᄾ ᅎ ᅐ ᅔ ᅕ, and the tone dots (방점) 〮 〯. A tap types the letter, and the
+Hangul engine composes it with the 2-beolsik keys: ㆍ+ㅣ = ㆎ, ㆍ+ㆍ = ᆢ, ㅿ ㆁ ㆆ ㅱ ㅸ ㆄ also as finals, ㄹㆆ ㄹㅿ finals.
+A syllable with an old letter is written as conjoining jamo (U+1100 L, U+1161 V, U+11A8 T); modern syllables stay
+precomposed, so modern typing is unchanged. The OS's Noto Sans KR has every conjoining jamo, the 방점 and the
+ljmo / vjmo / tjmo features that draw them as one syllable (checked with fontTools). 방점 go in as they are, after
+the syllable. Later: physical-keyboard keys for the old letters; 방점 as Mandarin tones in the zh Hangul method
+(needs a dictionary with tones, e.g. CC-CEDICT).
+
 ### Input methods to choose from (zh)
 
 A language can offer several input methods (`methods=`, first = default); the user picks one in Settings >

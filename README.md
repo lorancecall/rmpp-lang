@@ -51,6 +51,8 @@ installer again (or `vellum reenable`).
   and the languages with a keyboard, in Settings order. The on-screen keyboard follows.
 - **Hanja (Korean):** tap **漢** on the format bar, or press the Hanja key or **F9**, to turn the Hangul before
   the cursor (or the selected word) into Hanja: pick from the candidates (1-9 on a physical keyboard).
+- **Old Hangul (옛한글):** Settings > Languages > Korean > Input > Old Hangul, then the **옛** button on the format
+  bar types ㆍ ㅿ ㆆ ㆁ ㅸ, old initial clusters and the tone dots (방점); they compose with the keyboard (ᄆᆞᆯᄊᆞᆷ).
 - **Japanese and Chinese in Hangul:** turn on the keyboard of Japanese or Chinese in Settings > Languages, switch
   to it (日 / 中), type the sound in Hangul and tap **変** / **汉** (or Hanja / F9): 니혼고 -> 日本語,
   다베마스 -> 食べます, 베이징 -> 北京, 니하오 -> 你好. Chinese can also be typed in pinyin (zhongguo, Space

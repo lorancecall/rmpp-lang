@@ -15,7 +15,8 @@ QStringList inputCycle();
 QString currentInput();
 void setInput(const QString &code);
 void cycleInput();
-QString inputLabel();                            // the add-on's label ("한") or the code ("EN", "RU")
+QString inputLabel();
+QString inputChoice(const QString &code);         // chosen input method (ko: modern | old), "" = none                            // the add-on's label ("한") or the code ("EN", "RU")
 QString inputMethod(const QString &code);        // layout | compose:<name> | none
 QString screenLayoutFor(const QString &code);    // on-screen layout id of a language ("" = none)
 QString inputForScreenLayout(const QString &layout);

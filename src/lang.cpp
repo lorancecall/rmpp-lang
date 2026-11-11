@@ -574,6 +574,10 @@ QString inputForScreenLayout(const QString &layout) {
         if (const Lang *l = findLang(c); l && l->layouts.contains(layout) && keyboardEnabled(c)) return c;
     return QStringLiteral("en");
 }
+QString inputChoice(const QString &code) {
+    const Lang *l = findLang(code);
+    return l ? l->method : QString();
+}
 QString inputLabel() {
     const QString c = currentInput();
     const Lang *l = findLang(c);

@@ -35,20 +35,46 @@ int indexIn(const char16_t *tab, int n, char16_t c) {
     for (int i = 0; i < n; ++i) if (tab[i] == c) return i;
     return -1;
 }
-bool isVowel(char16_t c) { return c >= 0x314F && c <= 0x3163; }
-bool isConsonant(char16_t c) { return c >= 0x3131 && c <= 0x314E; }
+
+// Old Hangul (옛한글), typed from the format bar's palette with the Korean "old" input method: archaic letters
+// as compatibility jamo (initial, final) or conjoining initials (clusters, Mandarin sibilants), archaic vowels.
+// A syllable with any of them is written as conjoining jamo (U+1100 L, U+1161 V, U+11A8 T), which fonts with
+// the ljmo / vjmo / tjmo features (the OS's Noto Sans KR) draw as one syllable; modern syllables stay precomposed.
+struct OldConsonant { char16_t compat, initial, final; };
+const OldConsonant OLD_CONSONANTS[] = {
+    {u'ㅿ', 0x1140, 0x11EB}, {u'ㆆ', 0x1159, 0x11F9}, {u'ㆁ', 0x114C, 0x11F0}, {u'ㅸ', 0x112B, 0x11E6},
+    {u'ㅱ', 0x111D, 0x11E2}, {u'ㆄ', 0x1157, 0x11F4}, {u'ㆅ', 0x1158, 0}, {u'ㅹ', 0x112C, 0},
+};
+const OldConsonant *oldConsonant(char16_t c) {
+    for (const auto &o : OLD_CONSONANTS) if (o.compat == c) return &o;
+    return nullptr;
+}
+bool isConjoiningInitial(char16_t c) { return (c >= 0x1100 && c <= 0x115E) || (c >= 0xA960 && c <= 0xA97C); }
+bool isOldVowel(char16_t c) { return c == u'ㆍ' || c == u'ㆎ' || c == 0x11A2; }   // ㆍ, ㆎ, ᆢ
+
+bool isVowel(char16_t c) { return (c >= 0x314F && c <= 0x3163) || isOldVowel(c); }
+bool isConsonant(char16_t c) { return (c >= 0x3131 && c <= 0x314E) || oldConsonant(c) || isConjoiningInitial(c); }
 bool isJamo(char16_t c) { return isVowel(c) || isConsonant(c); }
+
+bool validInitial(char16_t c) { return indexIn(CHO, 19, c) >= 0 || oldConsonant(c) || isConjoiningInitial(c); }
+bool validFinal(char16_t c) {
+    if (indexIn(JONG, 28, c) > 0) return true;
+    const OldConsonant *o = oldConsonant(c);
+    return o && o->final;
+}
 
 char16_t combineVowel(char16_t a, char16_t b) {
     static const char16_t t[][3] = {{u'ㅗ',u'ㅏ',u'ㅘ'},{u'ㅗ',u'ㅐ',u'ㅙ'},{u'ㅗ',u'ㅣ',u'ㅚ'},
-        {u'ㅜ',u'ㅓ',u'ㅝ'},{u'ㅜ',u'ㅔ',u'ㅞ'},{u'ㅜ',u'ㅣ',u'ㅟ'},{u'ㅡ',u'ㅣ',u'ㅢ'}};
+        {u'ㅜ',u'ㅓ',u'ㅝ'},{u'ㅜ',u'ㅔ',u'ㅞ'},{u'ㅜ',u'ㅣ',u'ㅟ'},{u'ㅡ',u'ㅣ',u'ㅢ'},
+        {u'ㆍ',u'ㅣ',u'ㆎ'},{u'ㆍ',u'ㆍ',char16_t(0x11A2)}};
     for (auto &r : t) if (r[0] == a && r[1] == b) return r[2];
     return 0;
 }
 char16_t combineFinal(char16_t a, char16_t b) {
     static const char16_t t[][3] = {{u'ㄱ',u'ㅅ',u'ㄳ'},{u'ㄴ',u'ㅈ',u'ㄵ'},{u'ㄴ',u'ㅎ',u'ㄶ'},
         {u'ㄹ',u'ㄱ',u'ㄺ'},{u'ㄹ',u'ㅁ',u'ㄻ'},{u'ㄹ',u'ㅂ',u'ㄼ'},{u'ㄹ',u'ㅅ',u'ㄽ'},
-        {u'ㄹ',u'ㅌ',u'ㄾ'},{u'ㄹ',u'ㅍ',u'ㄿ'},{u'ㄹ',u'ㅎ',u'ㅀ'},{u'ㅂ',u'ㅅ',u'ㅄ'}};
+        {u'ㄹ',u'ㅌ',u'ㄾ'},{u'ㄹ',u'ㅍ',u'ㄿ'},{u'ㄹ',u'ㅎ',u'ㅀ'},{u'ㅂ',u'ㅅ',u'ㅄ'},
+        {u'ㄹ',u'ㆆ',char16_t(0x11D9)},{u'ㄹ',u'ㅿ',char16_t(0x11D7)}};   // old: ㄹㆆ, ㄹㅿ
     for (auto &r : t) if (r[0] == a && r[1] == b) return r[2];
     return 0;
 }
@@ -61,7 +87,7 @@ Parsed parse(const std::vector<char16_t> &s) {
     size_t i = 0, n = s.size();
     if (n == 0) return p;
     if (isConsonant(s[0])) {
-        if (indexIn(CHO, 19, s[0]) < 0) return p;
+        if (!validInitial(s[0])) return p;
         p.cho = s[0]; i = 1;
     }
     if (i < n && isVowel(s[i])) {
@@ -73,7 +99,7 @@ Parsed parse(const std::vector<char16_t> &s) {
     }
     if (!p.cho && !p.jung) return p;
     if (i < n) {
-        if (!p.cho || !p.jung || !isConsonant(s[i]) || indexIn(JONG, 28, s[i]) <= 0) return p;
+        if (!p.cho || !p.jung || !isConsonant(s[i]) || !(validFinal(s[i]) || s[i] >= 0x11A8)) return p;
         p.jong = s[i++];
         if (i < n && isConsonant(s[i])) {
             char16_t f = combineFinal(p.jong, s[i]);
@@ -84,14 +110,45 @@ Parsed parse(const std::vector<char16_t> &s) {
     return p;
 }
 
+// Conjoining forms for an old syllable (0 = none).
+char16_t initialOf(char16_t c) {
+    if (int i = indexIn(CHO, 19, c); i >= 0) return char16_t(0x1100 + i);
+    if (const OldConsonant *o = oldConsonant(c)) return o->initial;
+    return isConjoiningInitial(c) ? c : 0;
+}
+char16_t vowelOf(char16_t c) {
+    if (int i = indexIn(JUNG, 21, c); i >= 0) return char16_t(0x1161 + i);
+    if (c == u'ㆍ') return 0x119E;
+    if (c == u'ㆎ') return 0x11A1;
+    return c >= 0x1160 && c <= 0x11A7 ? c : 0;
+}
+char16_t finalOf(char16_t c) {
+    if (int i = indexIn(JONG, 28, c); i > 0) return char16_t(0x11A8 + i - 1);
+    if (const OldConsonant *o = oldConsonant(c)) return o->final;
+    return c >= 0x11A8 && c <= 0x11FF ? c : 0;
+}
+
 QString render(const Parsed &p) {
     if (!p.ok) return {};
-    if (p.cho && p.jung) {
-        int c = indexIn(CHO, 19, p.cho), v = indexIn(JUNG, 21, p.jung);
-        int f = p.jong ? indexIn(JONG, 28, p.jong) : 0;
-        return QString(QChar(char16_t(0xAC00 + (c * 21 + v) * 28 + f)));
+    const bool modern = (!p.cho || indexIn(CHO, 19, p.cho) >= 0) && (!p.jung || indexIn(JUNG, 21, p.jung) >= 0)
+                        && (!p.jong || indexIn(JONG, 28, p.jong) > 0);
+    if (modern) {
+        if (p.cho && p.jung) {
+            int c = indexIn(CHO, 19, p.cho), v = indexIn(JUNG, 21, p.jung);
+            int f = p.jong ? indexIn(JONG, 28, p.jong) : 0;
+            return QString(QChar(char16_t(0xAC00 + (c * 21 + v) * 28 + f)));
+        }
+        return QString(QChar(p.cho ? p.cho : p.jung));
     }
-    return QString(QChar(p.cho ? p.cho : p.jung));
+    if (!p.cho || !p.jung) {                  // a lone old letter
+        const char16_t c = p.cho ? p.cho : p.jung;
+        return QString(QChar(c == 0x11A2 ? char16_t(0x11A2) : c));
+    }
+    QString out;
+    out += QChar(initialOf(p.cho));
+    out += QChar(vowelOf(p.jung));
+    if (p.jong) out += QChar(finalOf(p.jong));
+    return out;
 }
 
 // Input language for physical keyboards, shared with the on-screen keyboard and the indicator.
@@ -145,7 +202,7 @@ private:
         int cur = cv.toInt();
         if (cur <= 0 || cur > text.size()) return false;
         if (lastCursor >= 0 && cur != lastCursor) return false;
-        return text.mid(cur - 1, 1) == lastOut;
+        return cur >= lastOut.size() && text.mid(cur - lastOut.size(), lastOut.size()) == lastOut;
     }
 
     int cursorOf(QObject *obj) {
@@ -179,9 +236,10 @@ private:
             // Empty commit replacing the previous char acts as a backspace.
             if (commit.isEmpty() && e->replacementStart() == -1 && e->replacementLength() == 1
                 && stillComposing(obj) && block.size() > 1) {
+                const int prev = int(lastOut.size());
                 block.pop_back();
                 lastOut = render(parse(block));
-                e->setCommitString(lastOut, -1, 1);
+                e->setCommitString(lastOut, -prev, prev);
                 lastEvent = e; lastSet = lastOut;
                 return false;
             }
@@ -196,11 +254,12 @@ private:
             std::vector<char16_t> grown = block;
             grown.push_back(j);
             Parsed p = parse(grown);
+            const int prevLen = int(lastOut.size());
             if (p.ok) {
                 block = grown;
                 lastOut = render(p);
-                e->setCommitString(lastOut, -1, 1);
-                finish(obj, 0);
+                e->setCommitString(lastOut, -prevLen, prevLen);
+                finish(obj, int(lastOut.size()) - prevLen);
                 lastEvent = e; lastSet = lastOut;
                 return false;
             }
@@ -214,8 +273,8 @@ private:
                     QString out = render(pp) + render(pn);
                     block = next;
                     lastOut = render(pn);
-                    e->setCommitString(out, -1, 1);
-                    finish(obj, 1);
+                    e->setCommitString(out, -prevLen, prevLen);
+                    finish(obj, int(out.size()) - prevLen);
                     lastEvent = e; lastSet = out;
                     return false;
                 }
@@ -311,10 +370,11 @@ private:
             reset();
             return false;
         }
+        const int prev = int(lastOut.size());
         block.pop_back();
         lastOut = render(parse(block));
         QInputMethodEvent im;
-        im.setCommitString(lastOut, -1, 1);
+        im.setCommitString(lastOut, -prev, prev);
         ownSend = true;
         QCoreApplication::sendEvent(obj, &im);
         ownSend = false;
@@ -457,6 +517,7 @@ void applyInput(const char *why) {
         g_state->insert(QStringLiteral("korean"), on);
         g_state->insert(QStringLiteral("label"), rmpplang::inputLabel());
         g_state->insert(QStringLiteral("enabled"), rmpplang::inputCycle().size() > 1);
+        g_state->insert(QStringLiteral("old"), on && rmpplang::inputChoice(cur) == QLatin1String("old"));
     }
     // Keep the on-screen keyboard on the same language (only if that layout is one of its enabled languages).
     if (qstrcmp(why, "screen") == 0) return;
@@ -507,6 +568,111 @@ Rectangle {
 }
 )QML";
 
+// Old Hangul palette: a "옛" button left of the conversion button; it opens rows of old letters above the bar.
+// A tap sends the letter to the text field like a key, so the Hangul engine composes it (initials, vowels, finals);
+// 방점 (U+302E one dot, U+302F two dots) go in as they are, after the syllable.
+const char *kOldQml = R"QML(
+import QtQuick
+Item {
+    id: root
+    anchors.fill: parent
+    z: 7
+    visible: !!hangul.old
+    property bool open: false
+    onVisibleChanged: open = false
+    readonly property var rows: [
+        ["ㆍ", "ㅿ", "ㆆ", "ㆁ", "ㅸ", "ㅱ", "ㆄ", "ㆅ", "ㅹ"],
+        ["\u1122", "\u1123", "\u1127", "\u1129", "\u1120", "\u1121", "\u112D", "\u112F", "\u1132", "\u1136"],
+        ["\u113C", "\u113E", "\u114E", "\u1150", "\u1154", "\u1155", "\u302E", "\u302F"]
+    ]
+    Rectangle {
+        width: 76; height: 56; radius: 10
+        anchors.right: parent.right; anchors.rightMargin: 288
+        anchors.verticalCenter: parent.verticalCenter
+        color: root.open ? "white" : "black"
+        border.color: "white"; border.width: 2
+        Text {
+            anchors.centerIn: parent
+            text: "옛"
+            color: root.open ? "black" : "white"
+            font.family: "Noto Sans KR"; font.weight: Font.Normal; font.pixelSize: 34
+        }
+        MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: root.open = !root.open }
+    }
+    Rectangle {
+        visible: root.open
+        anchors.right: parent.right; anchors.rightMargin: 16
+        anchors.bottom: parent.top; anchors.bottomMargin: 8
+        width: col.width + 24; height: col.height + 24; radius: 12
+        color: "black"; border.color: "white"; border.width: 2
+        Column {
+            id: col
+            anchors.centerIn: parent
+            spacing: 8
+            Repeater {
+                model: root.rows
+                Row {
+                    spacing: 8
+                    Repeater {
+                        model: modelData
+                        Rectangle {
+                            width: 84; height: 76; radius: 8; color: "white"
+                            Text {
+                                anchors.centerIn: parent
+                                // 방점 shown on a dotted circle, initials on their own
+                                text: (modelData === "\u302E" || modelData === "\u302F") ? "\u25CC" + modelData : modelData
+                                color: "black"
+                                font.family: "Noto Sans KR"; font.pixelSize: 40
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: hangul.command = "insert:" + modelData + "#" + Date.now()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+)QML";
+
+void syncOldPalette() {
+    for (QWindow *w : QGuiApplication::allWindows()) {
+        auto *qw = qobject_cast<QQuickWindow *>(w);
+        if (!qw) continue;
+        QQuickItem *bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
+        if (!bar || bar->property("_hangulOld").toBool()) continue;
+        bar->setProperty("_hangulOld", true);
+        QQmlEngine *eng = qmlEngine(bar);
+        if (!eng) continue;
+        auto *ctx = new QQmlContext(eng->rootContext(), bar);
+        ctx->setContextProperty(QStringLiteral("hangul"), g_state);
+        QQmlComponent comp(eng);
+        comp.setData(QByteArray(kOldQml), QUrl(QStringLiteral("qrc:/hangul/OldPalette.qml")));
+        QObject *o = comp.beginCreate(ctx);
+        auto *item = qobject_cast<QQuickItem *>(o);
+        if (!item) {
+            for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
+            delete o;
+            continue;
+        }
+        item->setParentItem(bar);
+        item->setParent(bar);
+        comp.completeCreate();
+        qWarning("[hangul] old Hangul palette added to the format bar");
+    }
+}
+
+// A letter from the palette, typed into the focused field as if from the keyboard.
+void insertOld(const QString &s) {
+    QObject *obj = QGuiApplication::focusObject();
+    if (!obj || s.isEmpty()) return;
+    QInputMethodEvent im;
+    im.setCommitString(s);
+    QCoreApplication::sendEvent(obj, &im);
+}
+
 void syncIndicator() {
     for (QWindow *w : QGuiApplication::allWindows()) {
         auto *qw = qobject_cast<QQuickWindow *>(w);
@@ -544,19 +710,25 @@ void init() {
     g_state->insert(QStringLiteral("command"), QString());
     g_state->insert(QStringLiteral("enabled"), false);
     g_state->insert(QStringLiteral("label"), QStringLiteral("EN"));
+    g_state->insert(QStringLiteral("old"), false);
     QObject::connect(g_state, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) { rmpplang::cycleInput(); applyInput("indicator"); }
+        if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("insert:")))
+            insertOld(v.toString().mid(7).section(QLatin1Char('#'), 0, 0));
     });
     auto *timer = new QTimer(filter);
     QObject::connect(timer, &QTimer::timeout, filter, [] {
         // A language or keyboard turned off in Settings > Languages: currentInput() falls back to English.
         if (g_korean != composesHangul()
             || g_state->value(QStringLiteral("label")).toString() != rmpplang::inputLabel()
-            || g_state->value(QStringLiteral("enabled")).toBool() != (rmpplang::inputCycle().size() > 1))
+            || g_state->value(QStringLiteral("enabled")).toBool() != (rmpplang::inputCycle().size() > 1)
+            || g_state->value(QStringLiteral("old")).toBool()
+                   != (composesHangul() && rmpplang::inputChoice(rmpplang::currentInput()) == QLatin1String("old")))
             applyInput("settings");
         syncExternalKeyboard();
         followScreenLanguage();
         syncIndicator();
+        syncOldPalette();
     });
     timer->start(1500);
     qWarning("[hangul] filter installed");
