@@ -806,63 +806,74 @@ protected:
     }
 };
 
-// Marks of the swipe targets on the keys (left / right / top edge), while old letters are on.
+// Small arrows on the keys that can be swiped, toward each direction that works (◂ ▸ ▴), while old letters are
+// on. xochitl's VirtualKeyboard paints its keys itself (one QQuickPaintedItem, no item per key), so the arrows sit
+// in a layer over it at the key positions of the ko_KR layout, measured on the tablet (1620 px wide keyboard:
+// row 1 starts at x 156, rows 2 and 3 at 231 / 372, one key every ~144.5 px; rows at y 85, 205, 331).
 const char *kMarkQml = R"QML(
 import QtQuick
 Item {
     id: m
-    property Item key
-    anchors.fill: parent
-    visible: !!hangul.old
-    readonly property var marks: ({
-        "ㅈ": ["ᅎ", "ᅐ", ""], "ㅊ": ["ᅔ", "ᅕ", ""], "ㅅ": ["ᄼ", "ᄾ", "ㅿ"],
-        "ㄹ": ["", "", "ㅿ"], "ㅇ": ["", "", "ㆁ"], "ㅎ": ["", "", "ㆆ"], "ㅂ": ["", "", "ㅸ"],
-        "ㅁ": ["", "", "ㅱ"], "ㅍ": ["", "", "ㆄ"], "ㅏ": ["", "", "ㆍ"] })
-    readonly property var mk: marks[key ? key.text : ""] || ["", "", ""]
-    readonly property color ink: key && key.color ? key.color : "white"
-    Text { anchors.left: parent.left; anchors.leftMargin: 4; anchors.verticalCenter: parent.verticalCenter
-           text: m.mk[0]; color: m.ink; font.family: "Noto Sans KR"; font.pixelSize: 20 }
-    Text { anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
-           text: m.mk[1]; color: m.ink; font.family: "Noto Sans KR"; font.pixelSize: 20 }
-    Text { anchors.top: parent.top; anchors.topMargin: 2; anchors.horizontalCenter: parent.horizontalCenter
-           text: m.mk[2]; color: m.ink; font.family: "Noto Sans KR"; font.pixelSize: 20 }
+    property Item vk
+    x: vk ? vk.x : 0; y: vk ? vk.y : 0
+    width: vk ? vk.width : 0; height: vk ? vk.height : 0
+    z: 50
+    visible: !!hangul.old && !!vk && vk.visible && vk.language === "ko_KR" && !vk.symbolsSelected && !vk.shiftSelected
+    readonly property real s: width / 1620
+    // [row, index in row, left, right, up]
+    readonly property var keys: [
+        [0, 1, 1, 1, 0], [0, 4, 1, 1, 1], [1, 2, 0, 0, 1], [1, 3, 0, 0, 1], [1, 4, 0, 0, 1],
+        [0, 0, 0, 0, 1], [1, 0, 0, 0, 1], [2, 2, 1, 1, 0], [2, 3, 0, 0, 1], [1, 7, 0, 0, 1] ]
+    readonly property var x0: [156, 231, 372]
+    readonly property var ys: [85, 205, 331]
+    Repeater {
+        model: m.keys
+        Item {
+            readonly property real cx: (m.x0[modelData[0]] + 144.5 * modelData[1]) * m.s
+            readonly property real cy: m.ys[modelData[0]] * m.s
+            Text { visible: modelData[2] === 1; text: "◂"; color: "white"; font.pixelSize: 16
+                   x: parent.cx - 44 * m.s - width / 2; y: parent.cy - height / 2 }
+            Text { visible: modelData[3] === 1; text: "▸"; color: "white"; font.pixelSize: 16
+                   x: parent.cx + 44 * m.s - width / 2; y: parent.cy - height / 2 }
+            Text { visible: modelData[4] === 1; text: "▴"; color: "white"; font.pixelSize: 16
+                   x: parent.cx - width / 2; y: parent.cy - 36 * m.s - height / 2 }
+        }
+    }
 }
 )QML";
 
+QQuickItem *findItemOfClass(QQuickItem *root, const char *cls, int depth = 0) {
+    if (!root || depth > 30) return nullptr;
+    if (qstrcmp(root->metaObject()->className(), cls) == 0) return root;
+    for (QQuickItem *c : root->childItems())
+        if (QQuickItem *f = findItemOfClass(c, cls, depth + 1)) return f;
+    return nullptr;
+}
+
 void syncSwipeMarks() {
-    if (!g_state || !g_state->value(QStringLiteral("old")).toBool()) return;
     QQuickItem *panel = findKeyboardPanel();
-    if (!panel) return;
-    QQmlEngine *eng = qmlEngine(panel);
+    QQuickItem *vk = panel ? findItemOfClass(panel, "VirtualKeyboard") : nullptr;
+    if (!vk || !vk->parentItem() || vk->property("_rmppMarks").toBool()) return;
+    QQmlEngine *eng = qmlEngine(vk);
+    if (!eng) eng = qmlEngine(panel);
     if (!eng) return;
-    std::function<void(QQuickItem *, int)> walk = [&](QQuickItem *it, int depth) {
-        if (!it || depth > 40) return;
-        const QString text = it->property("text").toString();
-        if (text.size() == 1 && swipeTarget(text.at(0).unicode(), 'U') + swipeTarget(text.at(0).unicode(), 'L') > 0
-            && strstr(it->metaObject()->className(), "Text") && !it->property("_rmppMark").toBool()) {
-            it->setProperty("_rmppMark", true);
-            QQuickItem *cell = it->parentItem();          // the key: the first ancestor clearly wider than the letter
-            while (cell && cell->parentItem() && cell->width() < it->width() + 24) cell = cell->parentItem();
-            if (cell) {
-                auto *ctx = new QQmlContext(eng->rootContext(), cell);
-                ctx->setContextProperty(QStringLiteral("hangul"), g_state);
-                QQmlComponent comp(eng);
-                comp.setData(QByteArray(kMarkQml), QUrl(QStringLiteral("qrc:/hangul/SwipeMark.qml")));
-                QObject *o = comp.beginCreate(ctx);
-                if (auto *mark = qobject_cast<QQuickItem *>(o)) {
-                    mark->setProperty("key", QVariant::fromValue(it));
-                    mark->setParentItem(cell);
-                    mark->setParent(cell);
-                    comp.completeCreate();
-                } else {
-                    for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
-                    delete o;
-                }
-            }
-        }
-        for (QQuickItem *c : it->childItems()) walk(c, depth + 1);
-    };
-    walk(panel, 0);
+    vk->setProperty("_rmppMarks", true);
+    auto *ctx = new QQmlContext(eng->rootContext(), vk);
+    ctx->setContextProperty(QStringLiteral("hangul"), g_state);
+    QQmlComponent comp(eng);
+    comp.setData(QByteArray(kMarkQml), QUrl(QStringLiteral("qrc:/hangul/SwipeMarks.qml")));
+    QObject *o = comp.beginCreate(ctx);
+    auto *marks = qobject_cast<QQuickItem *>(o);
+    if (!marks) {
+        for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
+        delete o;
+        return;
+    }
+    marks->setProperty("vk", QVariant::fromValue(vk));
+    marks->setParentItem(vk->parentItem());
+    marks->setParent(vk);
+    comp.completeCreate();
+    qWarning("[hangul] swipe marks added over the keyboard");
 }
 
 // Research probe (off unless /tmp/rmpp-lang-touch exists): logs touch / mouse events on windows with the
