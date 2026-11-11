@@ -260,7 +260,8 @@ Item {
             anchors.centerIn: parent
             text: "漢"
             color: hanja.open ? "black" : "white"
-            font.pixelSize: 30; font.bold: true
+            // Regular weight: bold 漢 at this size filled in on e-paper (developer: "thinner font")
+            font.family: "Noto Sans KR"; font.weight: Font.Normal; font.pixelSize: 34
         }
         MouseArea {
             anchors.fill: parent; anchors.margins: -8
