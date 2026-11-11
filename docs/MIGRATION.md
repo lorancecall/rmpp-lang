@@ -76,16 +76,8 @@ fonts are removed as package files, rmpp-lang's postinstall cleans `/usr/lib`. C
 
 ## rmpp-mod.conf (proposed)
 
-```ini
-id=rmpp-lang
-type=vellum
-package=rmpp-lang
-default=1
-short_ko=언어: 한글 입력과 언어별 글꼴
-short_en=Languages: Korean input, fonts per language
-detail_ko=설정 > 언어: 언어별 키보드와 글꼴. 화면·블루투스·USB·Type Folio|키보드로 한글 입력(Ctrl+Space 또는 오른쪽 Alt). 한국어·일본어·중국어|글꼴을 바꾸고 직접 추가(rmpp-lang font add 글꼴.ttf --lang ko).
-detail_en=Settings > Languages: keyboard and font per language. Korean on the|on-screen, Bluetooth, USB and Type Folio keyboards (Ctrl+Space or right|Alt). Fonts for Korean, Japanese, Chinese; add your own (rmpp-lang font add).
-```
+See `rmpp-mod.conf` on this branch (id `rmpp-lang`, `addons=` list of language add-ons published by rmpp-packages;
+the installer shows them indented under rmpp-lang, Korean always included).
 
 ## Development installs
 
