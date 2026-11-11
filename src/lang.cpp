@@ -20,6 +20,7 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
+#include <QtCore/QProcess>
 #include <QtCore/QResource>
 #include <QtCore/QSaveFile>
 #include <QtCore/QSet>
@@ -51,6 +52,7 @@ namespace {
 const QString kConfDir = QStringLiteral("/home/root/.config/rmpp-lang");
 const QString kConf = kConfDir + QStringLiteral("/lang.conf");
 const QString kState = kConfDir + QStringLiteral("/state.json");
+const QString kFontsJson = kConfDir + QStringLiteral("/fonts.json");   // per language: family + font file (rmpp-hwr)
 const QString kProbeReq = kConfDir + QStringLiteral("/probe");
 const QString kTraceFlag = kConfDir + QStringLiteral("/trace");
 const QString kProbeOut = QStringLiteral("/tmp/rmpp-lang-probe.txt");
@@ -343,6 +345,46 @@ void applyFonts() {
     qWarning("[rmpp-lang] fallbacks: %s latin: %s", qPrintable(msg), qPrintable(fontOf(QStringLiteral("latin"))));
 }
 
+QString deviceDefault(const Lang &l);
+
+// A font file for a family, for renderers outside Qt (rmpp-hwr's ink glyphs): a file rmpp-lang registered (the
+// "Regular" one if there are several), else fontconfig's match. Returns {file, family of that file}.
+QPair<QString, QString> fontFileFor(const QString &family) {
+    QString best;
+    for (const FontFile &f : std::as_const(g_files)) {
+        if (!f.families.contains(family)) continue;
+        const QString name = QFileInfo(f.path).fileName();
+        if (best.isEmpty() || name.contains(QLatin1String("Regular"), Qt::CaseInsensitive)) best = f.path;
+    }
+    if (!best.isEmpty()) return {best, family};
+    QProcess p;
+    p.start(QStringLiteral("fc-match"), {QStringLiteral("-f"), QStringLiteral("%{file}\n%{family[0]}"),
+                                          family + QStringLiteral(":style=Regular")});
+    if (!p.waitForFinished(3000)) return {};
+    const QStringList out = QString::fromUtf8(p.readAllStandardOutput()).split('\n');
+    return {out.value(0).trimmed(), out.value(1).trimmed()};
+}
+
+// fonts.json: the one font per language that other add-ons draw with (rmpp-hwr Convert to ink).
+//   {"version": 1, "languages": {"ko": {"family": "...", "file": "/....otf", "chosen": "..."}, ...}}
+// "chosen" is the user's choice ("" = default); "family"/"file" what is actually used. xochitl's own
+// "reMarkable Sans" has no file: then fontconfig's substitute is given (its family in "family").
+void writeFontsJson() {
+    QJsonObject langs;
+    for (const Lang &l : g_langs) {
+        const QString chosen = fontOf(l.code);
+        const QString family = chosen.isEmpty() ? deviceDefault(l) : chosen;
+        const auto ff = fontFileFor(family);
+        langs.insert(l.code, QJsonObject{{"family", ff.second.isEmpty() ? family : ff.second},
+                                         {"file", ff.first}, {"chosen", chosen}});
+    }
+    QSaveFile f(kFontsJson);
+    if (f.open(QIODevice::WriteOnly)) {
+        f.write(QJsonDocument(QJsonObject{{"version", 1}, {"languages", langs}}).toJson(QJsonDocument::Indented));
+        f.commit();
+    }
+}
+
 void writeState() {
     QJsonArray langs;
     const QStringList on = enabledCodes();
@@ -372,6 +414,7 @@ void writeState() {
         f.write(QJsonDocument(QJsonObject{{"version", 1}, {"languages", langs}}).toJson(QJsonDocument::Indented));
         f.commit();
     }
+    writeFontsJson();
 }
 
 // ---- QFont interposition (probe and typed-text font) ----

@@ -66,6 +66,27 @@ with; `files` are paths a renderer outside Qt (rmpp-hwr's ink glyphs) can open. 
 rmpp-lang has no keyboard for the language. The file is rewritten whenever something changes; readers should
 treat unknown keys as optional.
 
+### fonts.json (one font per language, for drawing outside Qt)
+
+The developer's decision: each language has one font, chosen centrally in rmpp-lang; other add-ons (rmpp-hwr's
+Convert to ink) draw with it and offer no font choice of their own.
+`/home/root/.config/rmpp-lang/fonts.json`, rewritten with state.json:
+
+```json
+{ "version": 1,
+  "languages": {
+    "ko":    { "family": "Noto Sans CJK KR", "file": "/home/root/.local/share/rmpp-lang/languages/ko/fonts/NotoSansCJKkr-Regular.otf", "chosen": "" },
+    "ja":    { "family": "Noto Sans CJK JP", "file": "/home/root/.local/share/fonts/NotoSansJPFont/NotoSansCJKjp-Regular.otf", "chosen": "Noto Sans CJK JP" },
+    "en":    { "family": "Noto Sans", "file": "/usr/share/fonts/ttf/noto/NotoSans-VariableFont_wdth,wght.ttf", "chosen": "" },
+    "latin": { "family": "Noto Sans", "file": "/usr/share/fonts/ttf/noto/NotoSans-VariableFont_wdth,wght.ttf", "chosen": "" } } }
+```
+
+- `chosen`: the user's choice (`""` = default). `family` / `file`: what is actually used, always a readable file.
+- The file is a font rmpp-lang registered (the "Regular" one of the family when it has several), else fontconfig's
+  match (`fc-match "<family>:style=Regular"`). xochitl's own "reMarkable Sans" (en/latin default) is not a file:
+  fontconfig's substitute is given and `family` names it. Files may be variable fonts or .ttc collections.
+- Every installed language has an entry (enabled or not); use state.json for which are on.
+
 ## Fonts
 
 ### Per-script fallback (works)
