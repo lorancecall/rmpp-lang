@@ -26,6 +26,7 @@
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
 #include <functional>
+#include <string>
 #include <vector>
 
 namespace {
@@ -159,6 +160,16 @@ bool g_korean = false;              // the input language composes Hangul
 bool composesHangul() { return rmpplang::inputMethod(rmpplang::currentInput()) == QLatin1String("compose:hangul"); }
 void applyInput(const char *why);
 void noteJamo(char16_t j);          // a jamo was typed (swipe.cpp part below)
+bool oldLettersOn();                // the input language types old letters (old_letters=1)
+
+// Hardware keyboards: a tap of left Alt alone turns the jamo just typed into the next letter of its row (the same
+// order as the on-screen swipes: left, right, up), and back to the plain letter.
+const char16_t *altCycle(char16_t base) {
+    static const char16_t *rows[] = {u"ㅈᅎᅐ", u"ㅊᅔᅕ", u"ㅅᄼᄾㅿ", u"ㄹㅿ",
+                                     u"ㅇㆁㆆ", u"ㅎㆆㆅ", u"ㅂㅸ", u"ㅁㅱ", u"ㅍㆄ", u"ㅏㆍ"};
+    for (const char16_t *r : rows) if (r[0] == base) return r;
+    return nullptr;
+}
 
 // Old syllables are conjoining jamo (2-3 characters drawn as one). When the engine replaces them while typing,
 // xochitl redraws only the region it computes for the changed characters, and parts of the stacked syllable stay
@@ -256,6 +267,9 @@ protected:
             return onInputMethod(obj, static_cast<QInputMethodEvent *>(ev));
         case QEvent::KeyPress:
             return onKeyPress(obj, static_cast<QKeyEvent *>(ev));
+        case QEvent::KeyRelease:
+            onKeyRelease(obj, static_cast<QKeyEvent *>(ev));
+            break;
         case QEvent::ShortcutOverride:
             if (debug) qWarning("[hangul] shortcutOverride key=0x%x obj=%s", static_cast<QKeyEvent *>(ev)->key(), obj->metaObject()->className());
             break;
@@ -418,11 +432,41 @@ private:
         return j;
     }
 
+    // ---- left Alt: cycle the jamo just typed through its old letters ----
+    bool altAlone = false;          // left Alt is down and no other key came since
+    char16_t cycleBase = 0;         // plain letter of the row being cycled
+
+    static bool isLeftAlt(const QKeyEvent *k) { return k->key() == Qt::Key_Alt && !isToggleKey(k); }
+
+    void onKeyRelease(QObject *obj, QKeyEvent *k) {
+        if (!isLeftAlt(k) || k->isAutoRepeat()) return;
+        const bool alone = altAlone;
+        altAlone = false;
+        if (!alone || obj != QGuiApplication::focusObject() || !oldLettersOn() || block.empty()
+            || !stillComposing(obj)) return;
+        const char16_t cur = block.back();
+        const char16_t *row = cycleBase ? altCycle(cycleBase) : nullptr;
+        if (!row || !std::char_traits<char16_t>::find(row, std::char_traits<char16_t>::length(row), cur)) {
+            row = altCycle(cur);
+            if (!row) return;
+            cycleBase = cur;
+        }
+        const size_t n = std::char_traits<char16_t>::length(row);
+        const size_t i = std::char_traits<char16_t>::find(row, n, cur) - row;
+        replaceLast(cur, row[(i + 1) % n]);
+    }
+
     bool onKeyPress(QObject *obj, QKeyEvent *k) {
         const bool atFocus = (obj == QGuiApplication::focusObject());
         if (debug)
             qWarning("[hangul] key=0x%x sc=%u mods=0x%x text=%s obj=%s focus=%d", k->key(), k->nativeScanCode(),
                      uint(k->modifiers()), qPrintable(k->text()), obj->metaObject()->className(), int(atFocus));
+        if (isLeftAlt(k)) {
+            if (!k->isAutoRepeat()) altAlone = true;
+            return false;
+        }
+        altAlone = false;
+        if (k->key() != Qt::Key_Shift) cycleBase = 0;
 
         // Ctrl+Space: toggle, and swallow it so no space is typed.
         if (k->key() == Qt::Key_Space && (k->modifiers() & ~Qt::KeypadModifier) == Qt::ControlModifier) {

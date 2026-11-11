@@ -229,13 +229,16 @@ the syllable. Later: physical-keyboard keys for the old letters; 방점 as Manda
 
 ### Old letters by long press and swipe (old_letters=1: ko Old Hangul, zh Hangul method)
 
-- **Long press** (xochitl's own popup: a key's list in keyboard_layout.json holds its long-press choices, as in the
-  built-in pl_PL `"e": ["e", "è", ...]`): ㅈ ᅎ ᅐ, ㅊ ᅔ ᅕ, ㅅ ᄼ ᄾ ㅿ, ㅂ ㅸ, ㅁ ㅱ, ㅇ ㆁ ㆆ, ㄹ ㅿ, ㅎ ㆆ ㆅ, ㅍ ㆄ,
-  ㅏ ㆍ in ko_KR (always there; a short tap still types the modern letter).
+- **No long press**: a key's list in keyboard_layout.json does hold long-press choices (built-in pl_PL
+  `"e": ["e", "è", ...]`), but such keys type on release, which felt slow; dropped for swipes.
+- **Hardware keyboards**: a tap of left Alt alone turns the jamo just typed into the next letter of its row
+  (ㅈ -> ᅎ -> ᅐ -> ㅈ, ㅅ -> ᄼ -> ᄾ -> ㅿ -> ㅅ, ㅇ -> ㆁ -> ㆆ, ㅎ -> ㆆ -> ㆅ, ㄹ -> ㅿ, ㅂ -> ㅸ, ㅁ -> ㅱ, ㅍ -> ㆄ, ㅏ -> ㆍ);
+  right Alt stays the language switch.
 - **Swipe**: keys type on press (seen with a touch probe, 4-40 ms after the touch begins); a touch on the keyboard
   that ends 40 px or more left / right / up replaces the jamo just typed: ㅈ ㅊ ㅅ left = 치두음 ᅎ ᅔ ᄼ (z c s),
   right = 정치음 ᅐ ᅕ ᄾ (zh ch sh) -- the long stroke of the letter points that way --, up = ㅿ (ㅅ ㄹ), ㆁ (ㅇ),
-  ㆆ (ㅎ), ㅸ (ㅂ), ㅱ (ㅁ), ㆄ (ㅍ), ㆍ (ㅏ). Small marks of the targets sit at those edges of the keys.
+  ㆆ (ㅎ), ㅸ (ㅂ), ㅱ (ㅁ), ㆄ (ㅍ), ㆍ (ㅏ). xochitl types a swiped key's Shift letter (ㅆ ㅉ ㅃ), mapped the same.
+  Short gray bars on those edges of the keys (a layer over the painted keyboard) show where a swipe works.
 - **zh Hangul method**: zh.map also has the first syllable with an old initial as conjoining jamo (ᅐᅮᆼ = zhong,
   ᅎᅳ = ze / zi, ᅀᅳ = re / ri, ᅗᅡᆫ = fan); plain letters still match everything. On rime data: 즈 1015
   candidates -> ᅐᅳ 713 / ᅎᅳ 308, 스 704 -> ᄼᅳ 259, 르 71 -> ᅀᅳ 28.
