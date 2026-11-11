@@ -215,20 +215,53 @@ Hanja (button 変 for ja, 汉 for zh; Hanja key / F9).
 - **Later**: phrase conversion (several words at once), a Traditional Chinese option, learning the user's picks,
   live kana while typing.
 
-### Input methods to choose from (zh)
+### Old Hangul (ko input method "old")
 
-A language can offer several input methods (`methods=`, first = default); the user picks one in Settings >
-Languages > (language) > Input, or with `rmpp-lang method CODE NAME` (`method.<code>` in lang.conf). The manifest's
+Settings > Languages > Korean > Old Hangul (a switch: `method_toggle=old`; indicator 옛). The 옛 button on the format bar opens rows of
+letters: archaic letters ㆍ ㅿ ㆆ ㆁ ㅸ ㅱ ㆄ ㆅ ㅹ, initial clusters ᄢ ᄣ ᄧ ᄩ ᄠ ᄡ ᄭ ᄯ ᄲ ᄶ, the sibilants used for
+Mandarin in Hongmu Jeongun Yeokhun ᄼ ᄾ ᅎ ᅐ ᅔ ᅕ, and the tone dots (방점) 〮 〯. A tap types the letter, and the
+Hangul engine composes it with the 2-beolsik keys: ㆍ+ㅣ = ㆎ, ㆍ+ㆍ = ᆢ, ㅿ ㆁ ㆆ ㅱ ㅸ ㆄ also as finals, ㄹㆆ ㄹㅿ finals.
+A syllable with an old letter is written as conjoining jamo (U+1100 L, U+1161 V, U+11A8 T); modern syllables stay
+precomposed, so modern typing is unchanged. The OS's Noto Sans KR has every conjoining jamo, the 방점 and the
+ljmo / vjmo / tjmo features that draw them as one syllable (checked with fontTools). 방점 go in as they are, after
+the syllable. Later: physical-keyboard keys for the old letters; 방점 as Mandarin tones in the zh Hangul method
+(needs a dictionary with tones, e.g. CC-CEDICT).
+
+### Old letters by long press and swipe (old_letters=1: ko Old Hangul, zh Hangul method)
+
+- **No long press**: a key's list in keyboard_layout.json does hold long-press choices (built-in pl_PL
+  `"e": ["e", "è", ...]`), but such keys type on release, which felt slow; dropped for swipes.
+- **Hardware keyboards**: a tap of left Alt alone turns the jamo just typed into the next letter of its row
+  (ㅈ -> ᅎ -> ᅐ -> ㅈ, ㅅ -> ᄼ -> ᄾ -> ㅿ -> ㅅ, ㅇ -> ㆁ -> ㆆ, ㅎ -> ㆆ -> ㆅ, ㄹ -> ㅿ, ㅂ -> ㅸ, ㅁ -> ㅱ, ㅍ -> ㆄ, ㅏ -> ㆍ);
+  right Alt stays the language switch.
+- **Swipe**: keys type on press (seen with a touch probe, 4-40 ms after the touch begins); a touch on the keyboard
+  that ends 40 px or more left / right / up replaces the jamo just typed: ㅈ ㅊ ㅅ left = 치두음 ᅎ ᅔ ᄼ (z c s),
+  right = 정치음 ᅐ ᅕ ᄾ (zh ch sh) -- the long stroke of the letter points that way --, up = ㅿ (ㅅ ㄹ), ㆁ (ㅇ),
+  ㆆ (ㅎ), ㅸ (ㅂ), ㅱ (ㅁ), ㆄ (ㅍ), ㆍ (ㅏ). xochitl types a swiped key's Shift letter (ㅆ ㅉ ㅃ), mapped the same.
+  Short gray bars on those edges of the keys (a layer over the painted keyboard) show where a swipe works.
+- **zh Hangul method**: zh.map also has the first syllable with an old initial as conjoining jamo (ᅐᅮᆼ = zhong,
+  ᅎᅳ = ze / zi, ᅀᅳ = re / ri, ᅗᅡᆫ = fan); plain letters still match everything. On rime data: 즈 1015
+  candidates -> ᅐᅳ 713 / ᅎᅳ 308, 스 704 -> ᄼᅳ 259, 르 71 -> ᅀᅳ 28.
+
+### Input methods to choose from (zh, ja)
+
+A language can offer several input methods (`methods=`, first = default; names in the language itself); the user
+picks one in Settings > Languages > (language) > Input (a popup, like the font), or with `rmpp-lang method CODE NAME` (`method.<code>` in lang.conf). The manifest's
 `key@method=` values override the plain keys for that method (input, layouts, requires, keyboard_name, label,
 convert, convert_dict, convert_map, convert_simplify). zh offers:
 
-- `hangul` (default): Mandarin sounds in Hangul (중궈 -> 中国), as above.
-- `pinyin`: letters on the Latin layout, the standard Chinese input: the letters before the cursor are the pinyin
+- `pinyin` (default, 拼音): letters on the Latin layout, the standard Chinese input: the letters before the cursor are the pinyin
   (no tones), candidates are the exact words then words starting with it (prediction), by frequency. Space
   converts, and picks the first candidate while the bar is open; 汉 / Hanja key / F9 also convert.
 - `hanja`: Korean Hanja readings (중국 -> 中国 / 中國) for those who know Hanja through Sino-Korean readings:
   the ko add-on's word dictionary (`convert_dict@hanja=@ko/dict/hanja.txt`, `@code/` = another add-on's folder),
   each word in Simplified (OpenCC, `dict/t2s.txt`) and Traditional.
+- `hangul` (韩文注音): Mandarin sounds in Hangul (중궈 -> 中国), as above.
+
+ja offers `romaji` (default, ローマ字入力: nihongo -> 日本語, Hepburn and kunrei-shiki, っ by a doubled
+consonant, ん by n / nn / n', ー by -, table `dict/romaji.map`; Space converts and picks) and `hangul`
+(ハングル入力: 니혼고 -> 日本語). A reading table whose keys are Latin letters makes the run the letters before the
+cursor.
 
 ### Next keyboards
 
@@ -306,6 +339,8 @@ convert_map=               # Hangul -> reading table for kana / pinyin; ja: dict
 convert_simplify=          # Traditional -> Simplified table for the candidates (zh hanja method)
 methods=                   # input methods the user can choose, first = default (zh: hangul pinyin hanja)
 method_name.<m>=           # how Settings names method <m>; key@<m>= overrides key for that method
+method_toggle=             # a method that is an on/off option on top of the first (ko: old) -> a switch in Settings
+method_description=        # text under that switch
 requires=                  # add-ons this one needs, comma list (ja, zh: ko, whose layout they type on); the
                            # packages depend on rmpp-lang-<code> and the installer selects them too
 keyboard_default=1         # 0 = keyboard off until the user turns it on (ja, zh)

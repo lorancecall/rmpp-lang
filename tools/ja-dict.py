@@ -170,6 +170,37 @@ def exclusions():
     return lambda line: any(p.search(line) for p in pats)
 
 
+def build_romaji():
+    """Romaji (Hepburn and kunrei-shiki, as Japanese IMEs accept) -> kana, for the ja "romaji" input method."""
+    base = {}
+    rows = {"": "あいうえお", "k": "かきくけこ", "g": "がぎぐげご", "s": "さしすせそ", "z": "ざじずぜぞ",
+            "t": "たちつてと", "d": "だぢづでど", "n": "なにぬねの", "h": "はひふへほ", "b": "ばびぶべぼ",
+            "p": "ぱぴぷぺぽ", "m": "まみむめも", "r": "らりるれろ", "y": "や\0ゆいぇよ", "w": "わうぃう\0うぇを"}
+    for c, kana in rows.items():
+        for v, k in zip("aiueo", kana.replace("いぇ", "\x01").replace("うぃ", "\x02").replace("うぇ", "\x03")):
+            k = {"\x01": "いぇ", "\x02": "うぃ", "\x03": "うぇ"}.get(k, k)
+            if k != "\0":
+                base[c + v] = k
+    base.update({"shi": "し", "chi": "ち", "tsu": "つ", "fu": "ふ", "ji": "じ", "wo": "を", "nn": "ん", "n'": "ん",
+                 "n": "ん", "-": "ー", "fa": "ふぁ", "fi": "ふぃ", "fe": "ふぇ", "fo": "ふぉ", "vu": "ゔ",
+                 "va": "ゔぁ", "vi": "ゔぃ", "ve": "ゔぇ", "vo": "ゔぉ", "thi": "てぃ", "dhi": "でぃ", "che": "ちぇ",
+                 "she": "しぇ", "je": "じぇ", "xtu": "っ", "ltu": "っ"})
+    for c, i in (("k", "き"), ("g", "ぎ"), ("s", "し"), ("z", "じ"), ("t", "ち"), ("d", "ぢ"), ("n", "に"),
+                 ("h", "ひ"), ("b", "び"), ("p", "ぴ"), ("m", "み"), ("r", "り")):
+        for v, sm in (("a", "ゃ"), ("u", "ゅ"), ("o", "ょ")):
+            base[c + "y" + v] = i + sm
+    for c, i in (("sh", "し"), ("ch", "ち"), ("j", "じ"), ("cy", "ち")):
+        for v, sm in (("a", "ゃ"), ("u", "ゅ"), ("o", "ょ")):
+            base[c + v] = i + sm
+    for v, k in zip("aiueo", "ぁぃぅぇぉ"):
+        base["x" + v] = k; base["l" + v] = k
+    out = {k: [v] for k, v in base.items()}
+    for k, v in list(base.items()):          # doubled consonant = っ (kka = っか), not for n
+        if k[0] not in "aiueon-'x" and len(k) >= 2:
+            out.setdefault(k[0] + k, []).append("っ" + v)
+    return out
+
+
 def main():
     excluded = exclusions()
     if len(sys.argv) not in (2, 3):
@@ -188,6 +219,10 @@ def main():
                 rest = [r for r in m[s] if r[0] not in VOICED_KANA]
                 if voiced and rest:
                     f.write(f"^{s}\t{' '.join(rest + voiced)}\n")
+    with open(f"{out_dir}/romaji.map", "w", encoding="utf-8", newline="\n") as f:
+        f.write("# Romaji -> kana for rmpp-lang (tools/ja-dict.py), the ja \"romaji\" input method\n")
+        for k, v in sorted(build_romaji().items()):
+            f.write(f"{k}\t{' '.join(v)}\n")
     header, lines = build_dict(sys.argv[1])
     with open(f"{out_dir}/ja.txt", "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(header) + "\n")

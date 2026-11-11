@@ -29,6 +29,8 @@
 #include <QtCore/QThread>
 #include <QtCore/QTimer>
 #include <QtGui/QFont>
+#include <QtGui/QPainter>
+#include <QtGui/QImage>
 #include <QtGui/QFontDatabase>
 #include <QtGui/QFontMetricsF>
 #include <QtGui/QRawFont>
@@ -74,6 +76,7 @@ struct Lang {
     bool keyboardDefault = true;                          // keyboard on until the user changes it (keyboard_default=)
     QStringList requires;                                 // add-ons this one needs (ja, zh: ko, whose layout they type on)
     QString convertSimplify;                              // Traditional -> Simplified table for candidates (zh hanja)
+    bool oldLetters = false;                              // old Hangul letters typed (old_letters=1): palette, swipe
     QHash<QString, QString> kv;                           // the manifest, for input methods (key@method=)
     QStringList methods;                                  // input methods the user can choose (methods=), first = default
     QString method;                                       // the chosen one ("" = the add-on has no choice)
@@ -152,6 +155,7 @@ void applyMethod(Lang &l) {
     l.convertDict = get("convert_dict");
     l.convertMap = get("convert_map");
     l.convertSimplify = get("convert_simplify");
+    l.oldLetters = get("old_letters") == QLatin1String("1");
     l.requires = get("requires").split(',', Qt::SkipEmptyParts);
 }
 void applyMethods() {
@@ -574,6 +578,14 @@ QString inputForScreenLayout(const QString &layout) {
         if (const Lang *l = findLang(c); l && l->layouts.contains(layout) && keyboardEnabled(c)) return c;
     return QStringLiteral("en");
 }
+bool oldLetters(const QString &code) {
+    const Lang *l = findLang(code);
+    return l && l->oldLetters;
+}
+QString inputChoice(const QString &code) {
+    const Lang *l = findLang(code);
+    return l ? l->method : QString();
+}
 QString inputLabel() {
     const QString c = currentInput();
     const Lang *l = findLang(c);
@@ -813,6 +825,8 @@ void publish() {
             {"layouts", QJsonArray::fromStringList(l.layouts)},
             {"keyboardName", l.keyboardName},
             {"methods", QJsonArray::fromStringList(l.methods)},
+            {"methodToggle", l.kv.value(QStringLiteral("method_toggle"))},   // ko: old = an on/off option
+            {"methodDescription", l.kv.value(QStringLiteral("method_description"))},
             {"method", l.method},
             {"methodNames", [&] {
                  QJsonObject o;
