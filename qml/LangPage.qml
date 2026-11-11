@@ -245,20 +245,19 @@ Rectangle {
             }
             ArkControls.Panel {
                 // A method that is an option on top of the default one (ko: Old Hangul): a switch.
-                readonly property string opt: detail.e.methodToggle || ""
-                readonly property bool isOn: detail.e.method === opt
-                visible: !!detail.e.enabled && opt !== ""
-                label: ((detail.e.methodNames || {})[opt] || opt)
+                visible: !!detail.e.enabled && !!detail.e.methodToggle
+                label: (detail.e.methodNames || {})[detail.e.methodToggle] || detail.e.methodToggle || ""
                 description: detail.e.methodDescription || ""
                 Layout.fillWidth: true
                 action: ArkControls.Toggle {
-                    checked: parent.isOn
+                    checked: !!detail.e.methodToggle && detail.e.method === detail.e.methodToggle
                     MouseArea {
                         anchors.fill: parent
                         anchors.margins: -20
                         onClicked: {
-                            const p = parent.parent;
-                            page.send("method:" + detail.e.code + ":" + (p.isOn ? (detail.e.methods || [""])[0] : p.opt));
+                            const on = detail.e.method === detail.e.methodToggle;
+                            page.send("method:" + detail.e.code + ":"
+                                      + (on ? (detail.e.methods || [""])[0] : detail.e.methodToggle));
                         }
                     }
                 }
