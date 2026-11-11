@@ -664,6 +664,12 @@ void probe() {
     QStringList out;
     out << QStringLiteral("time ") + QDateTime::currentDateTime().toString(Qt::ISODate);
     out << QStringLiteral("enabled ") + enabledCodes().join(',');
+    // Built-in on-screen layouts (format research: are extra entries of a key's list long-press choices?)
+    for (const char *loc : {"de_DE", "fr_FR", "pl_PL", "en_US"}) {
+        QFile lf(QStringLiteral(":/misc/keyboards/%1/keyboard_layout.json").arg(QLatin1String(loc)));
+        if (lf.open(QIODevice::ReadOnly))
+            QFile::copy(lf.fileName(), QStringLiteral("/tmp/rmpp-lang-layout-%1.json").arg(QLatin1String(loc)));
+    }
     for (QChar::Script s : {QChar::Script_Latin, QChar::Script_Hangul, QChar::Script_Han, QChar::Script_Hiragana})
         out << QStringLiteral("fallback script %1: %2").arg(int(s)).arg(QFontDatabase::applicationFallbackFontFamilies(s).join(" | "));
     out << QStringLiteral("app font default: ") + QGuiApplication::font().family();
