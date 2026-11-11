@@ -1,5 +1,9 @@
 # rmpp-korean
 
+> **Becoming rmpp-lang** (branch `feature/rmpp-lang`): one add-on for the tablet's languages, Korean built in,
+> other languages as add-ons in `languages/`, fonts per language. See [docs/DESIGN.md](docs/DESIGN.md) and
+> [docs/MIGRATION.md](docs/MIGRATION.md). The text below describes the released rmpp-korean 0.1.0.
+
 Korean (Hangul) input and Korean fonts for the reMarkable Paper Pro, on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs without xovi and keeps working after a reboot.
 
 Tested on reMarkable Paper Pro, OS 3.29.1.0.
@@ -43,8 +47,9 @@ xochitl starts before `/home` is mounted, so the library and layout live in `/us
 Requires an aarch64 cross toolchain (Arm GNU `aarch64-none-linux-gnu`, GCC 14), Qt 6.10 headers (QtCore, QtGui, QtQml, QtQuick), the device's Qt libraries to link against, and `pyside6-rcc`.
 
 ```sh
-SDK=/path/to/sdk sh build.sh     # build/libhangul.so, build/ko_KR.rcc, build/fonts/
-sh deploy.sh                     # development install over ssh (host alias "rmpp")
+SDK=/path/to/sdk sh build.sh     # build/librmpp-lang.so, build/rmpp-lang.rcc, build/rmpp-lang, build/fonts/
+sh tools/build-addon.sh ru       # build/languages/ru/ and build/languages/ru.rcc
+ADDONS="ja ru" sh deploy.sh rmpp # development install over ssh (host alias "rmpp")
 ```
 
 Never run `systemctl stop xochitl` on the device: stopping it powers the tablet off. More than four xochitl restarts in ten minutes reboots it; `deploy.sh` runs `systemctl reset-failed xochitl` first.
