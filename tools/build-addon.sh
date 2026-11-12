@@ -10,6 +10,11 @@ for code in "$@"; do
   src=languages/$code
   [ -f "$src/language.conf" ] || { echo "no $src/language.conf" >&2; exit 1; }
   grep -q "^code=$code\$" "$src/language.conf" || { echo "$src/language.conf: code is not $code" >&2; exit 1; }
+  # Summaries become the package description: apk's pkgdesc must stay under 128 bytes.
+  grep '^summary_' "$src/language.conf" | while IFS= read -r line; do
+    n=$(printf '%s' "${line#*=}" | wc -c)
+    [ "$n" -lt 128 ] || { echo "$src/language.conf: ${line%%=*} is $n bytes (must be < 128)" >&2; exit 1; }
+  done
   # Shared code set (rmpp-hwr-db scripts/languages.py): ISO 639-1, or a listed variant such as zh-hant.
   case "$code" in en|latin) echo "$code is reserved for the core" >&2; exit 1 ;; esac
   echo "$code" | grep -Eq '^[a-z]{2}(-[a-z]{2,8})?$' || { echo "$code: not an ISO 639-1 code (or variant)" >&2; exit 1; }
