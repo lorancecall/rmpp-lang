@@ -245,7 +245,8 @@ the syllable. Later: physical-keyboard keys for the old letters; 방점 as Manda
   that ends 40 px or more left / right / up replaces the jamo just typed: ㅈ ㅊ ㅅ left = 치두음 ᅎ ᅔ ᄼ (z c s),
   right = 정치음 ᅐ ᅕ ᄾ (zh ch sh) -- the long stroke of the letter points that way --, up = ㅿ (ㅅ ㄹ), ㆁ (ㅇ),
   ㆆ (ㅎ), ㅸ (ㅂ), ㅱ (ㅁ), ㆄ (ㅍ), ㆍ (ㅏ). xochitl types a swiped key's Shift letter (ㅆ ㅉ ㅃ), mapped the same.
-  Short gray bars on those edges of the keys (a layer over the painted keyboard) show where a swipe works.
+  Small gray dots next to the letter, on each side a swipe works (a layer over the painted keyboard). A key press
+  repaints the keyboard over that layer, so the dots are redrawn 350 ms and 1 s after each touch on the keys.
 - **zh Hangul method**: zh.map also has the first syllable with an old initial as conjoining jamo (ᅐᅮᆼ = zhong,
   ᅎᅳ = ze / zi, ᅀᅳ = re / ri, ᅗᅡᆫ = fan); plain letters still match everything. On rime data: 즈 1015
   candidates -> ᅐᅳ 713 / ᅎᅳ 308, 스 704 -> ᄼᅳ 259, 르 71 -> ᅀᅳ 28.

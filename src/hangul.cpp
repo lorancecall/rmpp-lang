@@ -918,6 +918,14 @@ void noteJamo(char16_t j) {
     g_pendingDir = 0;
 }
 
+// A key press repaints the keyboard over the marks layer (the marks vanished after typing, seen on 3.29): redraw the
+// marks once the key's highlight is gone, by changing their color by one step.
+void nudgeMarks() {
+    static int tick = 0;
+    for (int ms : {350, 1000})
+        QTimer::singleShot(ms, [] { if (g_state) g_state->insert(QStringLiteral("tick"), ++tick); });
+}
+
 class SwipeFilter : public QObject {
 public:
     using QObject::QObject;
@@ -945,6 +953,7 @@ protected:
             }
             return false;
         }
+        if (g_touchBeginMs >= 0 && g_state->value(QStringLiteral("old")).toBool()) nudgeMarks();
         if (g_touchBeginMs < 0 || !oldLettersOn()) return false;
         const qreal dx = p.x() - start.x(), dy = p.y() - start.y();
         char dir = 0;
@@ -959,7 +968,7 @@ protected:
     }
 };
 
-// Small bars on the edges of the keys that can be swiped, on each side that works, while old letters are
+// Small gray dots next to the letters of the keys that can be swiped, on each side that works, while old letters are
 // on. xochitl's VirtualKeyboard paints its keys itself (one QQuickPaintedItem, no item per key), so the arrows sit
 // in a layer over it at the key positions of the ko_KR layout, measured on the tablet (1620 px wide keyboard:
 // row 1 starts at x 156, rows 2 and 3 at 231 / 372, one key every ~144.5 px; rows at y 85, 205, 331).
@@ -995,20 +1004,21 @@ Item {
         [0, 0, 0, 0, 1], [1, 0, 0, 0, 1], [2, 2, 1, 1, 0], [2, 3, 0, 0, 1], [1, 7, 0, 0, 1] ]
     readonly property var x0: [156, 231, 372]
     readonly property var ys: [85, 205, 331]
-    // Key cell: ~144 px wide, ~120 px tall; bars sit on its edges like grooves (developer: "막대 홈"), gray.
-    readonly property real kw: 132 * s
-    readonly property real kh: 104 * s
+    // Gray dots next to the letter on each side that can be swiped (developer: dots close to the letter, gray).
+    readonly property real d: Math.max(6, 8 * s)
+    readonly property real gap: 30 * s
+    readonly property color dot: (hangul.tick || 0) % 2 ? "#8c8c8c" : "#909090"
     Repeater {
         model: m.keys
         Item {
             readonly property real cx: (m.x0[modelData[0]] + 144.5 * modelData[1]) * m.s
             readonly property real cy: m.ys[modelData[0]] * m.s
-            Rectangle { visible: modelData[2] === 1; color: "#909090"; radius: 1.5
-                        width: 3; height: 22 * m.s; x: parent.cx - m.kw / 2; y: parent.cy - height / 2 }
-            Rectangle { visible: modelData[3] === 1; color: "#909090"; radius: 1.5
-                        width: 3; height: 22 * m.s; x: parent.cx + m.kw / 2 - width; y: parent.cy - height / 2 }
-            Rectangle { visible: modelData[4] === 1; color: "#909090"; radius: 1.5
-                        width: 22 * m.s; height: 3; x: parent.cx - width / 2; y: parent.cy - m.kh / 2 }
+            Rectangle { visible: modelData[2] === 1; color: m.dot; radius: width / 2
+                        width: m.d; height: m.d; x: parent.cx - m.gap - width / 2; y: parent.cy - height / 2 }
+            Rectangle { visible: modelData[3] === 1; color: m.dot; radius: width / 2
+                        width: m.d; height: m.d; x: parent.cx + m.gap - width / 2; y: parent.cy - height / 2 }
+            Rectangle { visible: modelData[4] === 1; color: m.dot; radius: width / 2
+                        width: m.d; height: m.d; x: parent.cx - width / 2; y: parent.cy - m.gap - height / 2 }
         }
     }
 }
@@ -1062,6 +1072,7 @@ void init() {
     g_state->insert(QStringLiteral("old"), false);
     g_state->insert(QStringLiteral("caseless"), false);
     g_state->insert(QStringLiteral("userShift"), 0.0);
+    g_state->insert(QStringLiteral("tick"), 0);
     QObject::connect(g_state, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) { rmpplang::cycleInput(); applyInput("indicator"); }
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("insert:")))
