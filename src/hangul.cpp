@@ -262,7 +262,7 @@ protected:
         case QEvent::InputMethodQuery:
             return onQuery(obj, static_cast<QInputMethodQueryEvent *>(ev));
         case QEvent::ShortcutOverride:
-            if (debug) qWarning("[hangul] shortcutOverride key=0x%x obj=%s", static_cast<QKeyEvent *>(ev)->key(), obj->metaObject()->className());
+            if (dbg()) qWarning("[hangul] shortcutOverride key=0x%x obj=%s", static_cast<QKeyEvent *>(ev)->key(), obj->metaObject()->className());
             break;
         case QEvent::FocusIn:
         case QEvent::FocusOut:
@@ -393,6 +393,7 @@ private:
     // ---- physical keyboard (Type Folio / Bluetooth) ----
     ulong lastToggleTs = ~0UL;
     bool debug = qEnvironmentVariableIntValue("HANGUL_DEBUG") != 0;
+    bool dbg() const { return debug || rmpplang::tracing(); }   // or `rmpp-lang probe trace on`
 
     static bool isToggleKey(const QKeyEvent *k) {
         const quint32 sc = k->nativeScanCode();
@@ -438,10 +439,16 @@ private:
     static bool isLeftAlt(const QKeyEvent *k) { return k->key() == Qt::Key_Alt && !isToggleKey(k); }
 
     void onKeyRelease(QObject *obj, QKeyEvent *k) {
-        if (!isLeftAlt(k) || k->isAutoRepeat()) return;
+        // One key event reaches this filter once per object on its way (the window first, then the focused item,
+        // then its parents): only the focused item's copy counts, or the window's copy clears altAlone first.
+        if (!isLeftAlt(k) || k->isAutoRepeat() || obj != QGuiApplication::focusObject()) return;
         const bool alone = altAlone;
         altAlone = false;
-        if (!alone || obj != QGuiApplication::focusObject() || !oldLettersOn() || block.empty()
+        if (dbg())
+            qWarning("[hangul] alt release alone=%d focus=%d old=%d block=%d composing=%d obj=%s", int(alone),
+                     int(obj == QGuiApplication::focusObject()), int(oldLettersOn()), int(block.size()),
+                     int(!block.empty() && stillComposing(obj)), obj->metaObject()->className());
+        if (!alone || !oldLettersOn() || block.empty()
             || !stillComposing(obj)) return;
         const char16_t cur = block.back();
         const char16_t *row = cycleBase ? altCycle(cycleBase) : nullptr;
@@ -457,15 +464,17 @@ private:
 
     bool onKeyPress(QObject *obj, QKeyEvent *k) {
         const bool atFocus = (obj == QGuiApplication::focusObject());
-        if (debug)
+        if (dbg())
             qWarning("[hangul] key=0x%x sc=%u mods=0x%x text=%s obj=%s focus=%d", k->key(), k->nativeScanCode(),
                      uint(k->modifiers()), qPrintable(k->text()), obj->metaObject()->className(), int(atFocus));
         if (isLeftAlt(k)) {
-            if (!k->isAutoRepeat()) altAlone = true;
+            if (atFocus && !k->isAutoRepeat()) altAlone = true;
             return false;
         }
-        altAlone = false;
-        if (k->key() != Qt::Key_Shift) cycleBase = 0;
+        if (atFocus) {
+            altAlone = false;
+            if (k->key() != Qt::Key_Shift) cycleBase = 0;
+        }
 
         // Ctrl+Space: toggle, and swallow it so no space is typed.
         if (k->key() == Qt::Key_Space && (k->modifiers() & ~Qt::KeypadModifier) == Qt::ControlModifier) {

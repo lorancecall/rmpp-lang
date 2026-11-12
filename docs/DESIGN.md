@@ -233,7 +233,10 @@ the syllable. Later: physical-keyboard keys for the old letters; 방점 as Manda
   `"e": ["e", "è", ...]`), but such keys type on release, which felt slow; dropped for swipes.
 - **Hardware keyboards**: a tap of left Alt alone turns the jamo just typed into the next letter of its row
   (ㅈ -> ᅎ -> ᅐ -> ㅈ, ㅅ -> ᄼ -> ᄾ -> ㅿ -> ㅅ, ㅇ -> ㆁ -> ㆆ, ㅎ -> ㆆ -> ㆅ, ㄹ -> ㅿ, ㅂ -> ㅸ, ㅁ -> ㅱ, ㅍ -> ㆄ, ㅏ -> ㆍ);
-  right Alt stays the language switch.
+  right Alt stays the language switch. Verified with a Bluetooth keyboard. xochitl hands one key event to the
+  app's filter once per object on its way (the window first, then the focused item, then its parents), so the
+  "Alt alone" state is read and cleared only on the focused item's copy; the window's copy used to clear it first.
+- The language button stays 한 with Old Hangul on: the 옛 button on the format bar already shows it.
 - **Swipe**: keys type on press (seen with a touch probe, 4-40 ms after the touch begins); a touch on the keyboard
   that ends 40 px or more left / right / up replaces the jamo just typed: ㅈ ㅊ ㅅ left = 치두음 ᅎ ᅔ ᄼ (z c s),
   right = 정치음 ᅐ ᅕ ᄾ (zh ch sh) -- the long stroke of the letter points that way --, up = ㅿ (ㅅ ㄹ), ㆁ (ㅇ),
@@ -418,7 +421,8 @@ rmpp-lang lang list | lang on ja | lang off ja | lang first ja
 rmpp-lang keyboard ko on|off
 rmpp-lang font add NanumMyeongjo-Regular.ttf --lang ko --use
 rmpp-lang font list [--lang ko] | font use "Noto Sans CJK JP" --lang ja | font rm FILE --lang ko
-rmpp-lang probe [trace on|off]       # fonts in use, for debugging (/tmp/rmpp-lang-probe.txt)
+rmpp-lang probe [trace on|off]       # fonts in use, for debugging (/tmp/rmpp-lang-probe.txt); trace on also logs
+                                     # hardware keys ([hangul] key= / alt release) to the xochitl journal
 python tools/rmpp-lang.py --host rmpp font get "Nanum Myeongjo" --lang ko --use    # from a computer
 ```
 

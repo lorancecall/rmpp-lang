@@ -1053,3 +1053,7 @@ void init() {
 
 static void rmppLangInit() { rmpplang::init(); }
 Q_COREAPP_STARTUP_FUNCTION(rmppLangInit)
+
+namespace rmpplang {
+bool tracing() { return g_trace.load(std::memory_order_relaxed); }
+} // namespace rmpplang

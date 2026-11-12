@@ -31,5 +31,6 @@ QString convertDict(const QString &code);
 QString convertMap(const QString &code);
 QString convertSimplify(const QString &code);     // Traditional -> Simplified table ("" = none)          // Hangul -> reading table (kana, pinyin); "" = none
 void hanjaInit();
+bool tracing();                                   // `rmpp-lang probe trace on` (debug logs)
 
 } // namespace rmpplang
