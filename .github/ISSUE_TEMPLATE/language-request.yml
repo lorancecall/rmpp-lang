@@ -10,6 +10,10 @@ body:
         an optional input method, and fonts. The more you can tell about how people type the language, the easier
         it is to build. Please check the [open requests](https://github.com/lorancecall/rmpp-lang/issues?q=label%3Alanguage-request)
         first; if yours is there, add a 👍 instead.
+
+        Every new language is tested on a real reMarkable Paper Pro before it ships, with screenshots taken with
+        [rmpp-studio](https://github.com/lorancecall/rmpp-studio). Already built it? Open a pull request instead
+        (see [CONTRIBUTING.md](https://github.com/lorancecall/rmpp-lang/blob/main/CONTRIBUTING.md)).
   - type: input
     id: language
     attributes:
@@ -66,12 +70,16 @@ body:
     attributes:
       label: Sample text
       description: A short sentence in the language, to check that fonts and shaping look right.
-  - type: dropdown
-    id: tester
+  - type: textarea
+    id: screenshots
     attributes:
-      label: Can you test it on a reMarkable Paper Pro?
+      label: Screenshots (if you already tried it)
+      description: rmpp-studio screenshots (`rmpp-ctl shot keyboard.png`) of the keyboard and of a typed sample, if you built or tried the language. Drag the images here.
+  - type: checkboxes
+    id: device
+    attributes:
+      label: Testing on a Paper Pro
+      description: A language ships only after it was tested on a real device.
       options:
-        - "Yes"
-        - "No"
-    validations:
-      required: true
+        - label: I have a reMarkable Paper Pro and will test this language on it (with rmpp-studio screenshots of the keyboard and a typed sample).
+          required: true

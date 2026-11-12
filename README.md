@@ -117,6 +117,13 @@ restarts in ten minutes reboots it; `deploy.sh` runs `systemctl reset-failed xoc
 rmpp-lang grew out of rmpp-korean 0.1.0 (Korean keyboard and fonts). There is no upgrade path: remove rmpp-korean
 (`vellum del rmpp-korean`) and install rmpp-lang with `rmpp-lang-ko`. See [docs/MIGRATION.md](docs/MIGRATION.md).
 
+## New languages
+
+Ask for a keyboard language with a [language request](https://github.com/lorancecall/rmpp-lang/issues/new?template=language-request.yml),
+or send a pull request with an add-on. Every new language is tested on a real Paper Pro, with
+[rmpp-studio](https://github.com/lorancecall/rmpp-studio) screenshots of the keyboard and a typed sample: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 GPL-3.0-only. See [LICENSE](LICENSE). Fonts you add keep their own licenses. The Hanja dictionary
