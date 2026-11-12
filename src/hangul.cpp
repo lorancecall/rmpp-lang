@@ -25,6 +25,7 @@
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
@@ -60,6 +61,34 @@ bool isVowel(char16_t c) { return (c >= 0x314F && c <= 0x3163) || isOldVowel(c);
 bool isConsonant(char16_t c) { return (c >= 0x3131 && c <= 0x314E) || oldConsonant(c) || isConjoiningInitial(c); }
 bool isJamo(char16_t c) { return isVowel(c) || isConsonant(c); }
 
+// Initial clusters typed letter by letter (Korean Old Hangul only): ㅂ ㅈ -> ᄧ, ㅂ ㅅ ㄱ -> ᄢ, ㅅ ㄱ -> ᄭ ... They form
+// only while the block has no vowel yet (start of a word, or after a syllable with a final), so 갑자 stays 갑자.
+bool clustersOn();
+struct Cluster { const char16_t *seq; char16_t initial; };
+const Cluster CLUSTERS[] = {   // longest first; doubled modern letters stay modern (ㄲ ㄸ ㅃ ㅆ ㅉ)
+    {u"ㅂㅅㄱ", 0x1122}, {u"ㅂㅅㄷ", 0x1123}, {u"ㅂㅅㅂ", 0x1124}, {u"ㅂㅅㅅ", 0x1125}, {u"ㅂㅅㅈ", 0x1126},
+    {u"ㅅㅂㄱ", 0x1133}, {u"ㅅㅅㅅ", 0x1134},
+    {u"ㄱㄱ", u'ㄲ'}, {u"ㄷㄷ", u'ㄸ'}, {u"ㅂㅂ", u'ㅃ'}, {u"ㅅㅅ", u'ㅆ'}, {u"ㅈㅈ", u'ㅉ'},
+    {u"ㄴㄱ", 0x1113}, {u"ㄴㄴ", 0x1114}, {u"ㄴㄷ", 0x1115}, {u"ㄴㅂ", 0x1116}, {u"ㄷㄱ", 0x1117},
+    {u"ㄹㄴ", 0x1118}, {u"ㄹㄹ", 0x1119}, {u"ㄹㅎ", 0x111A}, {u"ㄹㅇ", 0x111B}, {u"ㅁㅂ", 0x111C}, {u"ㅁㅇ", u'ㅱ'},
+    {u"ㅂㄱ", 0x111E}, {u"ㅂㄴ", 0x111F}, {u"ㅂㄷ", 0x1120}, {u"ㅂㅅ", 0x1121}, {u"ㅂㅈ", 0x1127}, {u"ㅂㅊ", 0x1128},
+    {u"ㅂㅌ", 0x1129}, {u"ㅂㅍ", 0x112A}, {u"ㅂㅇ", u'ㅸ'}, {u"ㅃㅇ", u'ㅹ'},
+    {u"ㅅㄱ", 0x112D}, {u"ㅅㄴ", 0x112E}, {u"ㅅㄷ", 0x112F}, {u"ㅅㄹ", 0x1130}, {u"ㅅㅁ", 0x1131}, {u"ㅅㅂ", 0x1132},
+    {u"ㅅㅇ", 0x1135}, {u"ㅅㅈ", 0x1136}, {u"ㅅㅊ", 0x1137}, {u"ㅅㅋ", 0x1138}, {u"ㅅㅌ", 0x1139}, {u"ㅅㅍ", 0x113A},
+    {u"ㅅㅎ", 0x113B}, {u"ㅇㄱ", 0x1141}, {u"ㅇㄷ", 0x1142}, {u"ㅇㅁ", 0x1143}, {u"ㅇㅂ", 0x1144}, {u"ㅇㅅ", 0x1145},
+    {u"ㅇㅿ", 0x1146}, {u"ㅇㅇ", 0x1147}, {u"ㅇㅈ", 0x1148}, {u"ㅇㅊ", 0x1149}, {u"ㅇㅌ", 0x114A}, {u"ㅇㅍ", 0x114B},
+    {u"ㅈㅇ", 0x114D}, {u"ㅊㅋ", 0x1152}, {u"ㅊㅎ", 0x1153}, {u"ㅍㅂ", 0x1156}, {u"ㅍㅇ", u'ㆄ'}, {u"ㅎㅎ", u'ㆅ'},
+};
+// Length of the cluster at the start of s (0 = none) and its initial.
+size_t clusterAt(const std::vector<char16_t> &s, char16_t *initial) {
+    if (!clustersOn()) return 0;
+    for (const Cluster &c : CLUSTERS) {
+        const size_t n = std::char_traits<char16_t>::length(c.seq);
+        if (s.size() >= n && std::equal(c.seq, c.seq + n, s.begin())) { *initial = c.initial; return n; }
+    }
+    return 0;
+}
+
 bool validInitial(char16_t c) { return indexIn(CHO, 19, c) >= 0 || oldConsonant(c) || isConjoiningInitial(c); }
 bool validFinal(char16_t c) {
     if (indexIn(JONG, 28, c) > 0) return true;
@@ -91,8 +120,10 @@ Parsed parse(const std::vector<char16_t> &s) {
     size_t i = 0, n = s.size();
     if (n == 0) return p;
     if (isConsonant(s[0])) {
-        if (!validInitial(s[0])) return p;
-        p.cho = s[0]; i = 1;
+        char16_t cl = 0;
+        if (size_t k = clusterAt(s, &cl)) { p.cho = cl; i = k; }
+        else if (!validInitial(s[0])) return p;
+        else { p.cho = s[0]; i = 1; }
     }
     if (i < n && isVowel(s[i])) {
         p.jung = s[i++];
@@ -262,7 +293,7 @@ protected:
         case QEvent::InputMethodQuery:
             return onQuery(obj, static_cast<QInputMethodQueryEvent *>(ev));
         case QEvent::ShortcutOverride:
-            if (debug) qWarning("[hangul] shortcutOverride key=0x%x obj=%s", static_cast<QKeyEvent *>(ev)->key(), obj->metaObject()->className());
+            if (dbg()) qWarning("[hangul] shortcutOverride key=0x%x obj=%s", static_cast<QKeyEvent *>(ev)->key(), obj->metaObject()->className());
             break;
         case QEvent::FocusIn:
         case QEvent::FocusOut:
@@ -393,6 +424,7 @@ private:
     // ---- physical keyboard (Type Folio / Bluetooth) ----
     ulong lastToggleTs = ~0UL;
     bool debug = qEnvironmentVariableIntValue("HANGUL_DEBUG") != 0;
+    bool dbg() const { return debug || rmpplang::tracing(); }   // or `rmpp-lang probe trace on`
 
     static bool isToggleKey(const QKeyEvent *k) {
         const quint32 sc = k->nativeScanCode();
@@ -438,10 +470,16 @@ private:
     static bool isLeftAlt(const QKeyEvent *k) { return k->key() == Qt::Key_Alt && !isToggleKey(k); }
 
     void onKeyRelease(QObject *obj, QKeyEvent *k) {
-        if (!isLeftAlt(k) || k->isAutoRepeat()) return;
+        // One key event reaches this filter once per object on its way (the window first, then the focused item,
+        // then its parents): only the focused item's copy counts, or the window's copy clears altAlone first.
+        if (!isLeftAlt(k) || k->isAutoRepeat() || obj != QGuiApplication::focusObject()) return;
         const bool alone = altAlone;
         altAlone = false;
-        if (!alone || obj != QGuiApplication::focusObject() || !oldLettersOn() || block.empty()
+        if (dbg())
+            qWarning("[hangul] alt release alone=%d focus=%d old=%d block=%d composing=%d obj=%s", int(alone),
+                     int(obj == QGuiApplication::focusObject()), int(oldLettersOn()), int(block.size()),
+                     int(!block.empty() && stillComposing(obj)), obj->metaObject()->className());
+        if (!alone || !oldLettersOn() || block.empty()
             || !stillComposing(obj)) return;
         const char16_t cur = block.back();
         const char16_t *row = cycleBase ? altCycle(cycleBase) : nullptr;
@@ -457,15 +495,17 @@ private:
 
     bool onKeyPress(QObject *obj, QKeyEvent *k) {
         const bool atFocus = (obj == QGuiApplication::focusObject());
-        if (debug)
+        if (dbg())
             qWarning("[hangul] key=0x%x sc=%u mods=0x%x text=%s obj=%s focus=%d", k->key(), k->nativeScanCode(),
                      uint(k->modifiers()), qPrintable(k->text()), obj->metaObject()->className(), int(atFocus));
         if (isLeftAlt(k)) {
-            if (!k->isAutoRepeat()) altAlone = true;
+            if (atFocus && !k->isAutoRepeat()) altAlone = true;
             return false;
         }
-        altAlone = false;
-        if (k->key() != Qt::Key_Shift) cycleBase = 0;
+        if (atFocus) {
+            altAlone = false;
+            if (k->key() != Qt::Key_Shift) cycleBase = 0;
+        }
 
         // Ctrl+Space: toggle, and swallow it so no space is typed.
         if (k->key() == Qt::Key_Space && (k->modifiers() & ~Qt::KeypadModifier) == Qt::ControlModifier) {
@@ -863,6 +903,7 @@ qint64 g_lastJamoMs = 0, g_touchBeginMs = -1, g_pendingUntil = 0;
 char g_pendingDir = 0;
 
 bool oldLettersOn() { return composesHangul() && rmpplang::oldLetters(rmpplang::currentInput()); }
+bool clustersOn() { return oldLettersOn() && rmpplang::currentInput() == QLatin1String("ko"); }
 
 void applySwipe(char16_t jamo, char dir) {
     const char16_t to = swipeTarget(jamo, dir);
@@ -875,6 +916,14 @@ void noteJamo(char16_t j) {
     g_lastJamoMs = QDateTime::currentMSecsSinceEpoch();
     if (g_pendingDir && g_lastJamoMs <= g_pendingUntil) applySwipe(j, g_pendingDir);   // key typed on release
     g_pendingDir = 0;
+}
+
+// A key press repaints the keyboard over the marks layer (the marks vanished after typing, seen on 3.29): redraw the
+// marks once the key's highlight is gone, by changing their color by one step.
+void nudgeMarks() {
+    static int tick = 0;
+    for (int ms : {350, 1000})
+        QTimer::singleShot(ms, [] { if (g_state) g_state->insert(QStringLiteral("tick"), ++tick); });
 }
 
 class SwipeFilter : public QObject {
@@ -904,6 +953,7 @@ protected:
             }
             return false;
         }
+        if (g_touchBeginMs >= 0 && g_state->value(QStringLiteral("old")).toBool()) nudgeMarks();
         if (g_touchBeginMs < 0 || !oldLettersOn()) return false;
         const qreal dx = p.x() - start.x(), dy = p.y() - start.y();
         char dir = 0;
@@ -918,7 +968,7 @@ protected:
     }
 };
 
-// Small bars on the edges of the keys that can be swiped, on each side that works, while old letters are
+// Small gray dots next to the letters of the keys that can be swiped, on each side that works, while old letters are
 // on. xochitl's VirtualKeyboard paints its keys itself (one QQuickPaintedItem, no item per key), so the arrows sit
 // in a layer over it at the key positions of the ko_KR layout, measured on the tablet (1620 px wide keyboard:
 // row 1 starts at x 156, rows 2 and 3 at 231 / 372, one key every ~144.5 px; rows at y 85, 205, 331).
@@ -954,20 +1004,21 @@ Item {
         [0, 0, 0, 0, 1], [1, 0, 0, 0, 1], [2, 2, 1, 1, 0], [2, 3, 0, 0, 1], [1, 7, 0, 0, 1] ]
     readonly property var x0: [156, 231, 372]
     readonly property var ys: [85, 205, 331]
-    // Key cell: ~144 px wide, ~120 px tall; bars sit on its edges like grooves (developer: "막대 홈"), gray.
-    readonly property real kw: 132 * s
-    readonly property real kh: 104 * s
+    // Gray dots next to the letter on each side that can be swiped (developer: dots close to the letter, gray).
+    readonly property real d: Math.max(6, 8 * s)
+    readonly property real gap: 30 * s
+    readonly property color dot: (hangul.tick || 0) % 2 ? "#8c8c8c" : "#909090"
     Repeater {
         model: m.keys
         Item {
             readonly property real cx: (m.x0[modelData[0]] + 144.5 * modelData[1]) * m.s
             readonly property real cy: m.ys[modelData[0]] * m.s
-            Rectangle { visible: modelData[2] === 1; color: "#909090"; radius: 1.5
-                        width: 3; height: 22 * m.s; x: parent.cx - m.kw / 2; y: parent.cy - height / 2 }
-            Rectangle { visible: modelData[3] === 1; color: "#909090"; radius: 1.5
-                        width: 3; height: 22 * m.s; x: parent.cx + m.kw / 2 - width; y: parent.cy - height / 2 }
-            Rectangle { visible: modelData[4] === 1; color: "#909090"; radius: 1.5
-                        width: 22 * m.s; height: 3; x: parent.cx - width / 2; y: parent.cy - m.kh / 2 }
+            Rectangle { visible: modelData[2] === 1; color: m.dot; radius: width / 2
+                        width: m.d; height: m.d; x: parent.cx - m.gap - width / 2; y: parent.cy - height / 2 }
+            Rectangle { visible: modelData[3] === 1; color: m.dot; radius: width / 2
+                        width: m.d; height: m.d; x: parent.cx + m.gap - width / 2; y: parent.cy - height / 2 }
+            Rectangle { visible: modelData[4] === 1; color: m.dot; radius: width / 2
+                        width: m.d; height: m.d; x: parent.cx - width / 2; y: parent.cy - m.gap - height / 2 }
         }
     }
 }
@@ -1021,6 +1072,7 @@ void init() {
     g_state->insert(QStringLiteral("old"), false);
     g_state->insert(QStringLiteral("caseless"), false);
     g_state->insert(QStringLiteral("userShift"), 0.0);
+    g_state->insert(QStringLiteral("tick"), 0);
     QObject::connect(g_state, &QQmlPropertyMap::valueChanged, app, [](const QString &key, const QVariant &v) {
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("toggle"))) { rmpplang::cycleInput(); applyInput("indicator"); }
         if (key == QLatin1String("command") && v.toString().startsWith(QLatin1String("insert:")))
