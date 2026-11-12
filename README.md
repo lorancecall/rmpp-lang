@@ -1,7 +1,8 @@
 # rmpp-lang
 
-Languages for the reMarkable Paper Pro: a keyboard and a font for each language, on the on-screen keyboard and on
-Type Folio, Bluetooth and USB keyboards. Runs without xovi and keeps working after a reboot.
+Languages for the reMarkable Paper Pro: a keyboard and a font for each language (Korean with Old Hangul, Japanese,
+Chinese, Russian, ...), on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs without xovi
+and keeps working after a reboot.
 
 Tested on reMarkable Paper Pro, OS 3.29.1.
 
@@ -9,10 +10,12 @@ rmpp-lang is a small core plus one add-on per language. You pick the languages i
 
 | Add-on | Keyboard | Font (default) |
 |---|---|---|
-| `ko` Korean | 2-beolsik on screen; Hangul composed from physical keys too | Noto Sans KR |
+| `ko` Korean (with Old Hangul / 옛한글) | 2-beolsik on screen; Hangul composed from physical keys too; Hanja; Old Hangul | Noto Sans KR |
 | `ru` Russian | ЙЦУКЕН on screen and on physical keyboards | reMarkable's own (covers Cyrillic) |
-| `ja` Japanese | typed in Hangul on the Korean keyboard (도쿄 -> 東京), needs `ko` | Noto Sans JP |
-| `zh` Chinese | typed in Hangul on the Korean keyboard (중궈 -> 中国), needs `ko` | Noto Sans SC |
+| `ja` Japanese | romaji (nihongo -> 日本語); also by sound in Hangul (니혼고 -> 日本語) | Noto Sans JP |
+| `zh` Chinese | pinyin (zhongguo -> 中国); also by sound in Hangul (중궈 -> 中国) or Korean Hanja readings (중국 -> 中国) | Noto Sans SC |
+
+The Hangul options of Japanese and Chinese type on the Korean keyboard, so their packages install `ko` as well.
 
 English is always there. More languages are welcome: see [Add a language](docs/FONTS.md#add-a-language).
 
@@ -53,10 +56,13 @@ installer again (or `vellum reenable`).
   the cursor (or the selected word) into Hanja: pick from the candidates (1-9 on a physical keyboard).
 - **Old Hangul (옛한글):** turn on Settings > Languages > Korean > Old Hangul, then the **옛** button on the format
   bar types ㆍ ㅿ ㆆ ㆁ ㅸ, old initial clusters and the tone dots (방점); they compose with the keyboard (ᄆᆞᆯᄊᆞᆷ).
-- **Japanese and Chinese in Hangul:** turn on the keyboard of Japanese or Chinese in Settings > Languages, switch
-  to it (日 / 中), type the sound in Hangul and tap **変** / **汉** (or Hanja / F9): 니혼고 -> 日本語,
-  다베마스 -> 食べます, 베이징 -> 北京, 니하오 -> 你好. Chinese can also be typed in pinyin (zhongguo, Space
-  converts) or by Korean Hanja readings (중국 -> 中国 / 中國): Settings > Languages > Chinese > Input.
+- **Japanese:** turn on the Japanese keyboard in Settings > Languages, switch to it (日) and type romaji on the
+  Latin keys: `nihongo`, then Space (or **変** / F9) converts to 日本語; Space picks the first candidate. Also
+  supported, by sound in Hangul on the Korean keyboard: 니혼고 -> 日本語, 다베마스 -> 食べます. Choose in Settings >
+  Languages > Japanese > Input.
+- **Chinese:** switch to Chinese (中) and type pinyin: `zhongguo`, then Space (or **汉**) converts to 中国, with
+  predictions. Also supported: Mandarin by sound in Hangul (중궈 -> 中国, 베이징 -> 北京) or Korean Hanja readings
+  (중국 -> 中国 / 中國). Choose in Settings > Languages > Chinese > Input.
 - **Indicator:** a button on the format bar above the keyboard shows the current language (EN, 한, RU, ...); tap
   it to switch.
 - **External keyboards:** while a Bluetooth or USB keyboard is connected, the on-screen keys fold away and the
