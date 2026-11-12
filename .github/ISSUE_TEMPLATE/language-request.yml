@@ -1,0 +1,85 @@
+name: Language request
+description: Ask for a new keyboard language (or input method) in rmpp-lang.
+title: "Language request: "
+labels: ["language-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for asking! Each language in rmpp-lang is a small add-on (`languages/<code>/`): a keyboard layout,
+        an optional input method, and fonts. The more you can tell about how people type the language, the easier
+        it is to build. Please check the [open requests](https://github.com/lorancecall/rmpp-lang/issues?q=label%3Alanguage-request)
+        first; if yours is there, add a 👍 instead.
+
+        Every new language is tested on a real reMarkable Paper Pro before it ships, with screenshots taken with
+        [rmpp-studio](https://github.com/lorancecall/rmpp-studio). Already built it? Open a pull request instead
+        (see [CONTRIBUTING.md](https://github.com/lorancecall/rmpp-lang/blob/main/CONTRIBUTING.md)).
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      description: The name in English and in the language itself.
+      placeholder: "Greek / Ελληνικά"
+    validations:
+      required: true
+  - type: input
+    id: code
+    attributes:
+      label: Language code
+      description: ISO 639-1 (two letters), or a variant such as zh-hant. Leave empty if unsure.
+      placeholder: el
+  - type: input
+    id: script
+    attributes:
+      label: Script
+      description: The writing system(s) used.
+      placeholder: Greek
+    validations:
+      required: true
+  - type: textarea
+    id: layout
+    attributes:
+      label: Keyboard layout
+      description: The layout speakers use on phones and computers. A standard name or a link to a picture or spec is perfect.
+      placeholder: "Standard Greek layout (like Windows / macOS \"Greek\"), https://..."
+    validations:
+      required: true
+  - type: dropdown
+    id: input-method
+    attributes:
+      label: Does typing need composition or conversion?
+      description: Some languages combine keys into letters or convert typed text (Hangul jamo -> syllables, romaji -> kana -> kanji, pinyin -> characters, dead keys for accents).
+      options:
+        - "No: one key gives one letter"
+        - "Yes (please describe below)"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: input-details
+    attributes:
+      label: Composition / conversion details
+      description: How do people type it today? Dead keys, combining marks, a popular input method, a word list we could use (with its license)...
+  - type: textarea
+    id: fonts
+    attributes:
+      label: Fonts
+      description: Does the language need a font the tablet doesn't have? Name freely licensed fonts you'd like (e.g. a Noto family, with a link).
+  - type: textarea
+    id: example
+    attributes:
+      label: Sample text
+      description: A short sentence in the language, to check that fonts and shaping look right.
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots (if you already tried it)
+      description: rmpp-studio screenshots (`rmpp-ctl shot keyboard.png`) of the keyboard and of a typed sample, if you built or tried the language. Drag the images here.
+  - type: checkboxes
+    id: device
+    attributes:
+      label: Testing on a Paper Pro
+      description: A language ships only after it was tested on a real device.
+      options:
+        - label: I have a reMarkable Paper Pro and will test this language on it (with rmpp-studio screenshots of the keyboard and a typed sample).
+          required: true
