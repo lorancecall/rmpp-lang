@@ -25,6 +25,7 @@
 #include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickWindow>
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
@@ -60,6 +61,34 @@ bool isVowel(char16_t c) { return (c >= 0x314F && c <= 0x3163) || isOldVowel(c);
 bool isConsonant(char16_t c) { return (c >= 0x3131 && c <= 0x314E) || oldConsonant(c) || isConjoiningInitial(c); }
 bool isJamo(char16_t c) { return isVowel(c) || isConsonant(c); }
 
+// Initial clusters typed letter by letter (Korean Old Hangul only): ㅂ ㅈ -> ᄧ, ㅂ ㅅ ㄱ -> ᄢ, ㅅ ㄱ -> ᄭ ... They form
+// only while the block has no vowel yet (start of a word, or after a syllable with a final), so 갑자 stays 갑자.
+bool clustersOn();
+struct Cluster { const char16_t *seq; char16_t initial; };
+const Cluster CLUSTERS[] = {   // longest first; doubled modern letters stay modern (ㄲ ㄸ ㅃ ㅆ ㅉ)
+    {u"ㅂㅅㄱ", 0x1122}, {u"ㅂㅅㄷ", 0x1123}, {u"ㅂㅅㅂ", 0x1124}, {u"ㅂㅅㅅ", 0x1125}, {u"ㅂㅅㅈ", 0x1126},
+    {u"ㅅㅂㄱ", 0x1133}, {u"ㅅㅅㅅ", 0x1134},
+    {u"ㄱㄱ", u'ㄲ'}, {u"ㄷㄷ", u'ㄸ'}, {u"ㅂㅂ", u'ㅃ'}, {u"ㅅㅅ", u'ㅆ'}, {u"ㅈㅈ", u'ㅉ'},
+    {u"ㄴㄱ", 0x1113}, {u"ㄴㄴ", 0x1114}, {u"ㄴㄷ", 0x1115}, {u"ㄴㅂ", 0x1116}, {u"ㄷㄱ", 0x1117},
+    {u"ㄹㄴ", 0x1118}, {u"ㄹㄹ", 0x1119}, {u"ㄹㅎ", 0x111A}, {u"ㄹㅇ", 0x111B}, {u"ㅁㅂ", 0x111C}, {u"ㅁㅇ", u'ㅱ'},
+    {u"ㅂㄱ", 0x111E}, {u"ㅂㄴ", 0x111F}, {u"ㅂㄷ", 0x1120}, {u"ㅂㅅ", 0x1121}, {u"ㅂㅈ", 0x1127}, {u"ㅂㅊ", 0x1128},
+    {u"ㅂㅌ", 0x1129}, {u"ㅂㅍ", 0x112A}, {u"ㅂㅇ", u'ㅸ'}, {u"ㅃㅇ", u'ㅹ'},
+    {u"ㅅㄱ", 0x112D}, {u"ㅅㄴ", 0x112E}, {u"ㅅㄷ", 0x112F}, {u"ㅅㄹ", 0x1130}, {u"ㅅㅁ", 0x1131}, {u"ㅅㅂ", 0x1132},
+    {u"ㅅㅇ", 0x1135}, {u"ㅅㅈ", 0x1136}, {u"ㅅㅊ", 0x1137}, {u"ㅅㅋ", 0x1138}, {u"ㅅㅌ", 0x1139}, {u"ㅅㅍ", 0x113A},
+    {u"ㅅㅎ", 0x113B}, {u"ㅇㄱ", 0x1141}, {u"ㅇㄷ", 0x1142}, {u"ㅇㅁ", 0x1143}, {u"ㅇㅂ", 0x1144}, {u"ㅇㅅ", 0x1145},
+    {u"ㅇㅿ", 0x1146}, {u"ㅇㅇ", 0x1147}, {u"ㅇㅈ", 0x1148}, {u"ㅇㅊ", 0x1149}, {u"ㅇㅌ", 0x114A}, {u"ㅇㅍ", 0x114B},
+    {u"ㅈㅇ", 0x114D}, {u"ㅊㅋ", 0x1152}, {u"ㅊㅎ", 0x1153}, {u"ㅍㅂ", 0x1156}, {u"ㅍㅇ", u'ㆄ'}, {u"ㅎㅎ", u'ㆅ'},
+};
+// Length of the cluster at the start of s (0 = none) and its initial.
+size_t clusterAt(const std::vector<char16_t> &s, char16_t *initial) {
+    if (!clustersOn()) return 0;
+    for (const Cluster &c : CLUSTERS) {
+        const size_t n = std::char_traits<char16_t>::length(c.seq);
+        if (s.size() >= n && std::equal(c.seq, c.seq + n, s.begin())) { *initial = c.initial; return n; }
+    }
+    return 0;
+}
+
 bool validInitial(char16_t c) { return indexIn(CHO, 19, c) >= 0 || oldConsonant(c) || isConjoiningInitial(c); }
 bool validFinal(char16_t c) {
     if (indexIn(JONG, 28, c) > 0) return true;
@@ -91,8 +120,10 @@ Parsed parse(const std::vector<char16_t> &s) {
     size_t i = 0, n = s.size();
     if (n == 0) return p;
     if (isConsonant(s[0])) {
-        if (!validInitial(s[0])) return p;
-        p.cho = s[0]; i = 1;
+        char16_t cl = 0;
+        if (size_t k = clusterAt(s, &cl)) { p.cho = cl; i = k; }
+        else if (!validInitial(s[0])) return p;
+        else { p.cho = s[0]; i = 1; }
     }
     if (i < n && isVowel(s[i])) {
         p.jung = s[i++];
@@ -872,6 +903,7 @@ qint64 g_lastJamoMs = 0, g_touchBeginMs = -1, g_pendingUntil = 0;
 char g_pendingDir = 0;
 
 bool oldLettersOn() { return composesHangul() && rmpplang::oldLetters(rmpplang::currentInput()); }
+bool clustersOn() { return oldLettersOn() && rmpplang::currentInput() == QLatin1String("ko"); }
 
 void applySwipe(char16_t jamo, char dir) {
     const char16_t to = swipeTarget(jamo, dir);

@@ -237,6 +237,10 @@ the syllable. Later: physical-keyboard keys for the old letters; 방점 as Manda
   app's filter once per object on its way (the window first, then the focused item, then its parents), so the
   "Alt alone" state is read and cleared only on the focused item's copy; the window's copy used to clear it first.
 - The language button stays 한 with Old Hangul on: the 옛 button on the format bar already shows it.
+- **Initial clusters typed letter by letter** (Korean Old Hangul only): while the block has no vowel yet, consonants
+  combine into an initial cluster: ㅂㅈ -> ᄧ, ㅂㅌ -> ᄩ, ㅂㄷ -> ᄠ, ㅅㄱ -> ᄭ, ㅂㅅㄱ -> ᄢ, ㅂㅇ -> ㅸ, ㅇㅇ -> ᅇ,
+  ㅎㅎ -> ㆅ, ㄱㄱ -> ㄲ ... (table `CLUSTERS` in src/hangul.cpp). After a syllable without a final the first consonant
+  still becomes the final (갑자 stays 갑자); a cluster there comes from the 옛 palette.
 - **Swipe**: keys type on press (seen with a touch probe, 4-40 ms after the touch begins); a touch on the keyboard
   that ends 40 px or more left / right / up replaces the jamo just typed: ㅈ ㅊ ㅅ left = 치두음 ᅎ ᅔ ᄼ (z c s),
   right = 정치음 ᅐ ᅕ ᄾ (zh ch sh) -- the long stroke of the letter points that way --, up = ㅿ (ㅅ ㄹ), ㆁ (ㅇ),
