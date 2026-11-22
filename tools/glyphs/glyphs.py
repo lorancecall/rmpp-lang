@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Stroke glyph files of the language add-ons: pen strokes for text that rmpp-hwr writes on a page as ink
-("Add text", Convert to ink). Each add-on gets languages/<code>/glyphs.rmgl, the centre lines of its font.
+"""Stroke glyph files of the language add-ons: pen strokes for text written on a page as ink
+(rmpp-textobj's "Add text", rmpp-hwr's Convert to ink). Each add-on gets languages/<code>/glyphs.rmgl, the centre
+lines of its font.
 
 Method (from rmpp-hwr ink/glyphs.py, lorancecall/rmpp-hwr f0abc3c, GPL-3.0-only like this repository): render a
 character at SIZE px, thin it to 1 px (Zhang-Suen), trace the skeleton into a stroke graph, drop short spurs, join

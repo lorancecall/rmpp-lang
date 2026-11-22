@@ -417,17 +417,23 @@ runs `rmpp-lang lang on <code>`; xochitl restarts only when a layout was added o
 
 ## Glyph files
 
-Pen strokes for text that rmpp-hwr writes on a page as ink (text objects, Convert to ink): each add-on can ship
-`glyphs.rmgl`, the centre lines of its font, so packages that draw text depend on rmpp-lang instead of carrying
-fonts. Built by `tools/glyphs/glyphs.py build <code>` from the manifest's `glyph_font=` (a name in
+Pen strokes for text that is written on a page as ink (rmpp-textobj's text objects, rmpp-hwr's Convert to ink):
+each add-on can ship `glyphs.rmgl`, the centre lines of its font, so packages that draw text depend on rmpp-lang
+instead of carrying fonts. Built by `tools/glyphs/glyphs.py build <code>` from the manifest's `glyph_font=` (a name in
 `tools/glyphs/fonts.conf`: pinned google/fonts URL, SHA-256, OFL notice) and `glyph_chars=` (character sets, below),
 and committed: CJK files take long to build and change only with the font or the character sets. The method is
 rmpp-hwr's `ink/glyphs.py` (render at 160 px, Zhang-Suen thinning, skeleton graph, spur removal, joining straight
 continuations, Ramer-Douglas-Peucker), so the strokes match its `glyphs.json`.
 
 On the tablet: `/home/root/.local/share/rmpp-lang/languages/<code>/glyphs.rmgl` (part of the add-on's files,
-installed and removed with `rmpp-lang-<code>`). rmpp-hwr looks a character up in the file of the text's language
-(state.json order), then in the other add-ons' files, then in its own `glyphs.json` (ASCII, KS X 1001 Hangul).
+installed and removed with `rmpp-lang-<code>`). A reader looks a character up in the file of the text's language
+(state.json order), then in the other add-ons' files, then in its own `glyphs.json`.
+
+Who holds which characters (the developer's decision): ASCII lives only in rmpp-textobj's `glyphs.json`; every
+other character lives only in rmpp-lang, and the language files carry no ASCII (the space excepted). So Hangul
+comes from `rmpp-lang-ko` alone: its file holds all 11,172 syllables, a superset of the 2,350 KS X 1001 syllables
+that rmpp-hwr's `glyphs.json` used to carry. Without an add-on, its script falls back to nothing (the reader
+leaves those characters out); no language file relies on another one or on `glyphs.json` for anything but ASCII.
 The files are mapped and searched per character, so their size costs disk space in /home, not memory. A full
 build of all five takes about ten minutes on a PC (`--jobs` = cores).
 
