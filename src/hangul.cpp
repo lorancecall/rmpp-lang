@@ -15,6 +15,9 @@
 #include <QtGui/QInputMethod>
 #include <QtCore/QDateTime>
 #include <QtCore/QFile>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
 #include <QtCore/QTimer>
 #include <QtCore/QMetaMethod>
@@ -716,6 +719,11 @@ void applyInput(const char *why) {
 // xochitl parses a layout when the keyboard's language is set; selecting it again in Language & keyboard reloads
 // it. Do the same: another language, then this one again (in one event, before anything is painted).
 void rmpplang::reloadScreenLayout(const QStringList &layouts) {
+    if (g_state) {   // another input method's layout under the same id: measure its rows again
+        QVariantMap m = g_state->value(QStringLiteral("layoutUnits")).toMap();
+        for (const QString &l : layouts) m.remove(l);
+        g_state->insert(QStringLiteral("layoutUnits"), m);
+    }
     QObject *vk = findVirtualKeyboard();
     if (!vk) return;
     const QString cur = vk->property("language").toString();
@@ -1030,8 +1038,10 @@ void syncSwipeMarks() {
 // One place for the language switch everywhere: a 한 / EN key over the keyboard's own globe key (bottom left;
 // xochitl shows it when Language & keyboard has two or more layouts). The globe key would cycle only xochitl's
 // layouts; this key cycles rmpp-lang's languages in Settings order and shows the current one. Without a globe key
-// (one layout) the key sits just above the keys, at the right. Measured on the Paper Pro (1620 px keyboard): the
-// globe key's centre is 85 px from the left and 78 px above the bottom, one key about 140 x 110 px.
+// (one layout) the key sits just above the keys, at the right. Where the globe key is depends on the layout
+// (measured on the Paper Pro, 1620 px keyboard, ko_KR / en_US and bg_BG): one key unit is about 1595 px divided by
+// the widest alphabetic row (Shift and Backspace count 2 units), the bottom row is 11 units centred, so the globe
+// key's centre is width / 2 - 5 units, 78 px above the bottom. layoutUnits() reads that row width from the layout.
 //
 // Keyboards opened without xochitl's format bar (rmpp-textobj's edit box, other add-ons' fields, dialogs) get a bar
 // of the same height above the keys while the language needs it (conversion button and candidates, 옛 palette):
@@ -1048,6 +1058,7 @@ Item {
     readonly property bool shown: !!vk && vk.visible && vk.height > 0 && !secret
     readonly property bool noBar: !(bar && bar.visible && bar.height > 0)
     readonly property bool globe: !!vk && (vk.languages || []).length > 1
+    readonly property real unit: 1595 * s / ((vk && (hangul.layoutUnits || {})[vk.language]) || 11)
     x: vk ? vk.x : 0; y: vk ? vk.y : 0
     width: vk ? vk.width : 0; height: vk ? vk.height : 0
     z: 60
@@ -1067,8 +1078,8 @@ Item {
         id: key
         visible: k.shown && !!hangul.enabled && !(k.vk && k.vk.symbolsSelected && k.globe)
         readonly property bool onGlobe: k.globe
-        width: (onGlobe ? 132 : 76) * k.s; height: (onGlobe ? 104 : 56) * k.s; radius: 10 * k.s
-        x: onGlobe ? 85 * k.s - width / 2 : k.width - width - 24 * k.s
+        width: onGlobe ? 0.92 * k.unit : 76 * k.s; height: (onGlobe ? 104 : 56) * k.s; radius: 10 * k.s
+        x: onGlobe ? k.width / 2 - 5 * k.unit - width / 2 : k.width - width - 24 * k.s
         y: onGlobe ? k.height - 78 * k.s - height / 2
                    : (host.visible ? -host.height : 0) - height - 12 * k.s
         color: onGlobe ? "black" : (hangul.label !== "EN" ? "white" : "black")
@@ -1086,10 +1097,50 @@ Item {
 
 QPointer<QQuickItem> g_keyboardOverlay;
 
+// Width in key units of a layout's widest alphabetic row (keys 1, Shift / Backspace 2, or their "width"), following
+// "inherits" for layouts without their own rows. 0 when the layout cannot be read.
+double layoutUnits(const QString &lang, int depth = 0) {
+    if (lang.isEmpty() || depth > 3) return 0;
+    QFile f(QStringLiteral(":/misc/keyboards/") + lang + QStringLiteral("/keyboard_layout.json"));
+    if (!f.open(QIODevice::ReadOnly)) return 0;
+    const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+    const QJsonArray rows = o.value(QStringLiteral("alphabetic")).toArray();
+    if (rows.isEmpty()) return layoutUnits(o.value(QStringLiteral("inherits")).toString(), depth + 1);
+    double widest = 0;
+    for (const QJsonValue &r : rows) {
+        double w = 0;
+        for (const QJsonValue &kv : r.toArray()) {
+            const QJsonObject key = kv.toObject();
+            const QString sp = key.value(QStringLiteral("special")).toString();
+            const double dflt = (sp == QLatin1String("shift") || sp == QLatin1String("backspace")) ? 2 : 1;
+            w += key.value(QStringLiteral("width")).toDouble(dflt);
+        }
+        widest = qMax(widest, w);
+    }
+    return widest;
+}
+
+// Row widths of every layout the keyboard may show, for the QML (instant when the language changes).
+void syncLayoutUnits(const QString &current) {
+    QVariantMap m = g_state->value(QStringLiteral("layoutUnits")).toMap();
+    QStringList want{current, g_latinLanguage, QStringLiteral("en_US")};
+    for (const QString &code : rmpplang::inputCycle()) want << rmpplang::screenLayoutFor(code);
+    bool changed = false;
+    for (const QString &l : want) {
+        if (l.isEmpty() || m.contains(l)) continue;
+        const double u = layoutUnits(l);
+        m.insert(l, u > 0 ? u : 11);
+        qWarning("[hangul] layout %s: widest row %.1f units", qPrintable(l), u);
+        changed = true;
+    }
+    if (changed) g_state->insert(QStringLiteral("layoutUnits"), m);
+}
+
 void syncKeyboardOverlay() {
     QQuickItem *panel = findKeyboardPanel();
     QQuickItem *vk = panel ? findItemOfClass(panel, "VirtualKeyboard") : nullptr;
     if (!vk || !vk->parentItem()) return;
+    syncLayoutUnits(vk->property("language").toString());
     if (!g_keyboardOverlay) {
         QQmlEngine *eng = qmlEngine(vk);
         if (!eng) eng = qmlEngine(panel);
