@@ -65,10 +65,11 @@ const QString kProbeOut = QStringLiteral("/tmp/rmpp-lang-probe.txt");
 const QString kFontRoot = QStringLiteral("/home/root/.local/share/fonts/rmpp-lang");
 
 const QString kAddonRoot = QStringLiteral("/home/root/.local/share/rmpp-lang/languages");   // manifests, keymaps, fonts
-// The core's files live in Vellum's share folder in /home (rmpp-preload's one-file layout; xochitl starts after
-// home.mount). RMPPLANG_RCC (set by the package in rmpp-preload's env.d) may point elsewhere for hand-made installs.
+// The core's files live in /usr/lib/rmpp/rmpp-lang/ (rmpp-preload's one-folder layout): xochitl starts seconds
+// before the encrypted /home is mounted, so nothing it needs at startup may be in /home. RMPPLANG_RCC (set by
+// rmpp-preload's env.d) may point elsewhere for hand-made installs.
 QString coreRcc() {
-    return qEnvironmentVariable("RMPPLANG_RCC", QStringLiteral("/home/root/.vellum/share/rmpp-lang/rmpp-lang.rcc"));
+    return qEnvironmentVariable("RMPPLANG_RCC", QStringLiteral("/usr/lib/rmpp/rmpp-lang/rmpp-lang.rcc"));
 }
 // <code>.rcc (layouts of the add-ons): "languages" next to rmpp-lang.rcc.
 QString addonRccDir() {

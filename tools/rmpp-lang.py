@@ -25,8 +25,8 @@ def run(args, **kw):
 
 def tablet(host, args):
     """Run the tablet's rmpp-lang with these arguments."""
-    # Vellum's bin folder (where the package links the command) is not on a non-interactive ssh PATH.
-    return run(["ssh", host, "PATH=/home/root/.vellum/bin:$PATH rmpp-lang "
+    # The command is in rmpp-lang's folder (/usr/lib/rmpp/rmpp-lang), which is not on the ssh PATH.
+    return run(["ssh", host, "PATH=/usr/lib/rmpp/rmpp-lang:$PATH rmpp-lang "
                 + " ".join(shlex.quote(a) for a in args)]).returncode
 
 

@@ -103,12 +103,12 @@ built-in ones, sets one fallback font per script with `QFontDatabase::setApplica
 physical-keyboard keys per language, and composes Hangul for add-ons with `input=compose:hangul`. The Settings page
 is QML from `rmpp-lang.rcc`.
 
-Everything lives in `/home`: the library, `rmpp-lang.rcc`, the `rmpp-lang` command and the add-ons' layouts in
-Vellum's share folder (`/home/root/.vellum/share/rmpp-lang/`), settings and fonts in `/home/root/.config` and
-`/home/root/.local/share`. The only file on the read-only root file system is rmpp-preload's drop-in for xochitl,
-which starts xochitl after `/home` is mounted and falls back to plain xochitl when the launcher is gone, so an OS
-update leaves the add-on in place and a factory reset leaves a stock tablet. Design, add-on format and tablet
-findings: [docs/DESIGN.md](docs/DESIGN.md).
+xochitl starts seconds before the encrypted `/home` is mounted, so what it needs at startup (the library,
+`rmpp-lang.rcc`, the add-ons' layouts) is on the root file system, in one folder: `/usr/lib/rmpp/rmpp-lang/`,
+with the `rmpp-lang` command. Settings, fonts and the add-ons' data are in `/home` (`/home/root/.config/rmpp-lang`,
+`/home/root/.local/share`). The root file system is read-only and an OS update replaces it, which is why the
+packages put these files back with `vellum reenable`. Design, add-on format and tablet findings:
+[docs/DESIGN.md](docs/DESIGN.md).
 
 ## Build
 

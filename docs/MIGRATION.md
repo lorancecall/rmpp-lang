@@ -27,8 +27,8 @@ Korean comes back when rmpp-lang-ko registers it) and rmpp-bt's per-keyboard Typ
 
 ## rmpp-lang (core) package
 
-Up to 0.3.1 (below, kept for history). Since 0.3.2 nothing is copied to the root file system: the files stay in
-`/home/root/.vellum/share/rmpp-lang/` (see "Pieces" in [DESIGN.md](DESIGN.md)), and the 0.3.2 package removes
+Up to 0.3.1 (below, kept for history). Since 0.3.2 the files are copied to one folder, `/usr/lib/rmpp/rmpp-lang/`
+(see "Pieces" in [DESIGN.md](DESIGN.md)), linked from `/usr/lib/rmpp/preload.d/`; the 0.3.2 package removes
 `/usr/lib/rmpp-lang`, `/usr/bin/rmpp-lang` and the old preload link.
 
 | Package file | Copied to (postinstall / postupgrade / reenable) |
@@ -45,5 +45,5 @@ user fonts.
 
 ## Development installs
 
-`deploy.sh` installs rmpp-lang and the add-ons in `ADDONS` (default `ko`) the way the package does, in `/home`
-(needs rmpp-preload 0.2.0). Up to 0.3.1 it also parked rmpp-korean's preload link; rmpp-korean is gone now.
+`deploy.sh` installs rmpp-lang and the add-ons in `ADDONS` (default `ko`) the way the package does, in
+`/usr/lib/rmpp/rmpp-lang/` (needs rmpp-preload with the `/usr/lib/rmpp` layout). Up to 0.3.1 it also parked rmpp-korean's preload link; rmpp-korean is gone now.
