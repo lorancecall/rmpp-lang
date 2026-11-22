@@ -24,7 +24,7 @@ Dependencies are installed automatically, in rmpp setup and with `vellum add`. A
 ## Without rmpp setup
 
 Follow [manual-install.md](https://github.com/lorancecall/rmpp-packages/blob/main/docs/manual-install.md) (Vellum
-and the rmpp package repository), then on the tablet, one `rmpp-lang-<code>` per language:
+and the rmpp package repository), then on the Paper Pro, one `rmpp-lang-<code>` per language:
 
 ```sh
 vellum add rmpp-lang-ko
@@ -56,7 +56,7 @@ It runs next to xovi and other Vellum packages:
 ## Build and install by hand
 
 For developers. Requires an aarch64 cross toolchain (Arm GNU `aarch64-none-linux-gnu`, GCC 14), Qt 6.10 headers
-(QtCore, QtGui, QtQml, QtQuick), the device's Qt libraries to link against, and `pyside6-rcc`. The tablet needs
+(QtCore, QtGui, QtQml, QtQuick), the device's Qt libraries to link against, and `pyside6-rcc`. The Paper Pro needs
 rmpp-preload with the `/usr/lib/rmpp` layout (installed with any rmpp add-on).
 
 ```sh
@@ -66,7 +66,7 @@ ADDONS="ko ru" sh deploy.sh rmpp       # development install over ssh (host alia
 sh deploy.sh rmpp --remove             # remove it again
 ```
 
-Where the files go on the tablet:
+Where the files go on the Paper Pro:
 
 | Path | What |
 |---|---|
@@ -76,9 +76,9 @@ Where the files go on the tablet:
 | `/home/root/.config/rmpp-lang/` | settings, `state.json`, `fonts.json` |
 
 The root file system is read-only and an OS update replaces it; `deploy.sh` remounts it read-write only while it
-copies. Never run `systemctl stop xochitl` on the device: stopping it powers the tablet off. Run
+copies. Never run `systemctl stop xochitl` on the device: stopping it powers the Paper Pro off. Run
 `systemctl reset-failed xochitl` before a restart (`deploy.sh` does): more than four xochitl restarts in ten
-minutes reboots the tablet.
+minutes reboots the Paper Pro.
 
 Each add-on also carries `glyphs.rmgl`, pen strokes of its font for text written as ink (rmpp-textobj, rmpp-hwr);
 every non-ASCII glyph lives in these files. They are committed; rebuild one after changing its `glyph_font` /

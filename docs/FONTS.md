@@ -1,7 +1,7 @@
 # Fonts and languages
 
 rmpp-lang gives every language on the reMarkable Paper Pro one font, used wherever that language's script appears:
-typed text in notebooks, the keyboard, file names and the rest of the tablet. You pick it in
+typed text in notebooks, the keyboard, file names and the rest of the Paper Pro. You pick it in
 **Settings > Languages > (language) > Font**.
 
 ## Language codes
@@ -17,13 +17,13 @@ Fonts and languages are tagged with a language code: the two-letter
 | `ru`, `uk`, `el`, ... | other languages, once their add-on is installed |
 | `latin` | the font of typed Latin text (experimental; replaces reMarkable's own font in notebooks only) |
 
-`rmpp-lang lang list` on the tablet shows the codes installed there.
+`rmpp-lang lang list` on the Paper Pro shows the codes installed there.
 
 ## Add a font
 
 Use a `.ttf`, `.otf` or `.ttc` file whose license allows it (fonts under the SIL Open Font License are a safe choice).
 
-**From your computer** (needs ssh access to the tablet, as for the rmpp installer):
+**From your computer** (needs ssh access to the Paper Pro, as for the rmpp installer):
 
 ```sh
 python rmpp-lang.py --host rmpp font add MyFont-Regular.ttf MyFont-Bold.ttf --lang ko --use
@@ -33,7 +33,7 @@ python rmpp-lang.py --host rmpp font get "Nanum Myeongjo" --lang ko --use    # a
 `rmpp-lang.py` is in [tools/](../tools/rmpp-lang.py). `--use` makes it the language's font right away; without it,
 choose it later in Settings.
 
-**On the tablet** (ssh):
+**On the Paper Pro** (ssh):
 
 ```sh
 rmpp-lang font add /home/root/MyFont-Regular.ttf --lang ko --use

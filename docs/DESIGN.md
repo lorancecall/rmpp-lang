@@ -26,7 +26,7 @@ on); add-ons `ko`, `ja`, `zh`, `ru`, ... (rmpp-hwr uses the same codes).
 |---|---|---|
 | `librmpp-lang.so` | `/usr/lib/rmpp/rmpp-lang/`, linked as `/usr/lib/rmpp/preload.d/50-rmpp-lang.so` | Loaded into xochitl by rmpp-preload. `lang.cpp`: settings, fonts, add-ons, Settings page; `hangul.cpp`: Hangul composition (used by the ko add-on). |
 | `rmpp-lang.rcc` | `/usr/lib/rmpp/rmpp-lang/` (path in `RMPPLANG_RCC`, set by rmpp-preload's `env.d`; same default) | QML of the Settings page and its icon. (On-screen layouts come with the add-ons.) |
-| `rmpp-lang` | `/usr/lib/rmpp/rmpp-lang/rmpp-lang` | Tablet command (POSIX sh): languages, keyboards, fonts, probe. |
+| `rmpp-lang` | `/usr/lib/rmpp/rmpp-lang/rmpp-lang` | Paper Pro command (POSIX sh): languages, keyboards, fonts, probe. |
 | `tools/rmpp-lang.py` | computer | Same commands over ssh; uploads font files; fetches OFL families from google/fonts. |
 | `lang.conf` | `/home/root/.config/rmpp-lang/lang.conf` | Settings, `key=value`. Written by the Settings page and the command. |
 | `state.json` | `/home/root/.config/rmpp-lang/state.json` | What the add-on applied (for rmpp-hwr and the command). |
@@ -34,7 +34,7 @@ on); add-ons `ko`, `ja`, `zh`, `ru`, ... (rmpp-hwr uses the same codes).
 
 The library and resources must be on the root file system: xochitl starts before the encrypted `/home` is
 mounted (3.6 s vs 14.5 s on OS 3.29.1), and ordering xochitl after `home.mount` hangs the boot on the logo (the
-tablet then falls back to the other OS partition). Since 0.3.2 every rmpp root-fs file is under one folder,
+Paper Pro then falls back to the other OS partition). Since 0.3.2 every rmpp root-fs file is under one folder,
 `/usr/lib/rmpp/` (rmpp-lang in `/usr/lib/rmpp/rmpp-lang/`); the only file outside it is rmpp-preload's xochitl
 drop-in. Up to 0.3.1 they were in `/usr/lib/rmpp-lang` and `/usr/bin/rmpp-lang`. Everything the user changes
 lives in `/home` and survives OS updates. The add-on polls the settings file and the font folders every
@@ -114,7 +114,7 @@ Korean text follows the Korean font when `ko` comes first, and Japanese users ca
 (`rmpp-lang lang first ja`). Font files are registered with `QFontDatabase::addApplicationFont` (no fontconfig
 cache rebuild, no restart).
 
-Measured on the tablet (OS 3.29.1, Qt 6.10.3):
+Measured on the Paper Pro (OS 3.29.1, Qt 6.10.3):
 
 - Setting a fallback at runtime changes the UI at once (file names, Settings, the keyboard): installing
   NanumMyeongjo for `ko` turned "필기테스트" in My files into Myeongjo within the 1.5 s poll, no restart.
@@ -145,9 +145,9 @@ A per-script fallback cannot change Latin (the family has those glyphs), so rmpp
 ### Sync and PDF export
 
 - **Sync**: documents store the text and its paragraph styles, not fonts. Other devices and the reMarkable apps
-  show their own fonts; nothing rmpp-lang changes is uploaded. A missing font on the tablet only changes how this
-  tablet draws the text.
-- **PDF export** (made on the tablet by xochitl): expected to use the same layout and therefore embed the chosen
+  show their own fonts; nothing rmpp-lang changes is uploaded. A missing font on the Paper Pro only changes how this
+  Paper Pro draws the text.
+- **PDF export** (made on the Paper Pro by xochitl): expected to use the same layout and therefore embed the chosen
   fonts (Hangul in the Korean font, Latin in `font.latin` when set). Not tested yet; check that the exported PDF
   embeds the font subset and that line breaks match the screen. The font's license must allow embedding (OFL does).
 - **Handwriting conversion and search** work on text, not glyphs: unaffected.
@@ -300,7 +300,7 @@ Vietnamese (composition), then Japanese/Chinese IMEs.
 ## Language add-ons
 
 The core package `rmpp-lang` contains the library (with the composition engines), the Settings page, the command
-and the two entries every tablet has: `en` and `latin` (the typed-text font). Every language, Korean included, is
+and the two entries every Paper Pro has: `en` and `latin` (the typed-text font). Every language, Korean included, is
 an add-on: a folder in this repository, packaged as `rmpp-lang-<code>` (depends on `rmpp-lang`), chosen at install
 time (`default=1` preselects it; Korean has it). Adding a language = adding a folder; the core is not rebuilt.
 
@@ -389,7 +389,7 @@ altgr.a = ą Ą
 https://github.com/notofonts/noto-cjk/raw/<commit>/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf  <sha256>  NotoSansCJKjp-Regular.otf
 ```
 
-### On the tablet
+### On the Paper Pro
 
 | What | Path | Why there |
 |---|---|---|
@@ -425,7 +425,7 @@ and committed: CJK files take long to build and change only with the font or the
 rmpp-hwr's `ink/glyphs.py` (render at 160 px, Zhang-Suen thinning, skeleton graph, spur removal, joining straight
 continuations, Ramer-Douglas-Peucker), so the strokes match its `glyphs.json`.
 
-On the tablet: `/home/root/.local/share/rmpp-lang/languages/<code>/glyphs.rmgl` (part of the add-on's files,
+On the Paper Pro: `/home/root/.local/share/rmpp-lang/languages/<code>/glyphs.rmgl` (part of the add-on's files,
 installed and removed with `rmpp-lang-<code>`). A reader looks a character up in the file of the text's language
 (state.json order), then in the other add-ons' files, then in its own `glyphs.json`.
 
@@ -482,7 +482,7 @@ A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tails
 - **Font popup**: the families for the language (the user's, the add-on's, the device's), each shown in its own
   face; the language's default family comes first, marked "· default" (picking it stores `font.<code>=` empty,
   i.e. follow the default); one tap picks a font. Fonts are added and removed outside Settings (decided: no
-  remove button): with `rmpp-lang font add|rm` on the tablet or `tools/rmpp-lang.py` from a computer.
+  remove button): with `rmpp-lang font add|rm` on the Paper Pro or `tools/rmpp-lang.py` from a computer.
 
 Drill-down pages follow xochitl's own Settings (Wi-Fi network details); a popup is used only for the short font
 choice, where seeing the faces side by side helps. The page talks to the library through a `QQmlPropertyMap`
