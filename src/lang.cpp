@@ -131,8 +131,15 @@ QHash<QString, QString> readKeyValues(const QString &path) {
     return kv;
 }
 
+// Physical key map: keymap.conf, or the file the input method names (keymap@<method>=, bg: bds | phonetic).
 void loadKeymap(Lang &l) {
-    const auto kv = readKeyValues(l.dir + QStringLiteral("/keymap.conf"));
+    l.keys.clear();
+    l.altgr.clear();
+    if (l.dir.isEmpty()) return;
+    QString file = l.kv.value(QStringLiteral("keymap"), QStringLiteral("keymap.conf"));
+    if (!l.method.isEmpty()) file = l.kv.value(QStringLiteral("keymap@") + l.method, file);
+    if (file.isEmpty() || file.contains(QLatin1String(".."))) return;
+    const auto kv = readKeyValues(l.dir + QLatin1Char('/') + file);
     for (auto it = kv.cbegin(); it != kv.cend(); ++it) {
         QString key = it.key();
         auto *table = &l.keys;
@@ -166,6 +173,7 @@ void applyMethod(Lang &l) {
     l.convertSimplify = get("convert_simplify");
     l.oldLetters = get("old_letters") == QLatin1String("1");
     l.requires = get("requires").split(',', Qt::SkipEmptyParts);
+    loadKeymap(l);
 }
 void applyMethods() {
     for (Lang &l : g_langs) applyMethod(l);
@@ -246,6 +254,37 @@ void registerAddonLayouts() {
     for (const QFileInfo &fi : QDir(addonRccDir()).entryInfoList({QStringLiteral("*.rcc")}, QDir::Files)) {
         const bool ok = QResource::registerResource(fi.absoluteFilePath());
         qWarning("[rmpp-lang] layouts %s: %s", qPrintable(fi.fileName()), ok ? "registered" : "FAILED");
+    }
+}
+
+// On-screen layout per input method: <add-on>/keyboards@<method>.rcc (in /home, built from keyboards@<method>/)
+// holds layouts under the same ids as <code>.rcc and replaces them while that method is chosen (bg: bds | phonetic,
+// one "Bulgarian" entry in xochitl's list). Qt takes a file from the first registered resource that has it, so
+// <code>.rcc is registered again after the overlay. xochitl reads a layout when the keyboard is set up.
+QHash<QString, QString> g_screenOverlay;      // code -> registered overlay file
+void applyScreenOverlays() {
+    for (const QString &code : g_screenOverlay.keys())          // add-on removed
+        if (!findLang(code)) QResource::unregisterResource(g_screenOverlay.take(code));
+    for (const Lang &l : g_langs) {
+        if (l.dir.isEmpty()) continue;
+        QString want;
+        if (!l.method.isEmpty()) {
+            want = l.dir + QStringLiteral("/keyboards@") + l.method + QStringLiteral(".rcc");
+            if (!QFileInfo::exists(want)) want.clear();
+        }
+        const QString have = g_screenOverlay.value(l.code);
+        if (want == have) continue;
+        const QString base = addonRccDir() + QLatin1Char('/') + l.code + QStringLiteral(".rcc");
+        const bool hasBase = QFileInfo::exists(base);
+        if (hasBase) QResource::unregisterResource(base);
+        if (!have.isEmpty()) QResource::unregisterResource(have);
+        const bool ok = want.isEmpty() || QResource::registerResource(want);
+        if (hasBase) QResource::registerResource(base);
+        if (ok && !want.isEmpty()) g_screenOverlay.insert(l.code, want);
+        else g_screenOverlay.remove(l.code);
+        qWarning("[rmpp-lang] on-screen layouts %s: %s", qPrintable(l.code),
+                 want.isEmpty() ? "default" : ok ? qPrintable(QFileInfo(want).fileName()) : "overlay FAILED");
+        reloadScreenLayout(l.layouts);
     }
 }
 
@@ -858,6 +897,7 @@ void publish() {
 
 void applyAll(const char *why) {
     applyMethods();
+    applyScreenOverlays();
     scanFonts();
     applyFonts();
     writeState();

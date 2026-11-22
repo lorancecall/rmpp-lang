@@ -1,0 +1,319 @@
+{
+  "inherits": "en_US",
+  "alphabetic": [
+    [
+      {
+        "default": [
+          "у"
+        ],
+        "shifted": [
+          "У"
+        ]
+      },
+      {
+        "default": [
+          "е"
+        ],
+        "shifted": [
+          "Е"
+        ]
+      },
+      {
+        "default": [
+          "и",
+          "ѝ"
+        ],
+        "shifted": [
+          "И",
+          "Ѝ"
+        ]
+      },
+      {
+        "default": [
+          "ш"
+        ],
+        "shifted": [
+          "Ш"
+        ]
+      },
+      {
+        "default": [
+          "щ"
+        ],
+        "shifted": [
+          "Щ"
+        ]
+      },
+      {
+        "default": [
+          "к"
+        ],
+        "shifted": [
+          "К"
+        ]
+      },
+      {
+        "default": [
+          "с"
+        ],
+        "shifted": [
+          "С"
+        ]
+      },
+      {
+        "default": [
+          "д"
+        ],
+        "shifted": [
+          "Д"
+        ]
+      },
+      {
+        "default": [
+          "з"
+        ],
+        "shifted": [
+          "З"
+        ]
+      },
+      {
+        "default": [
+          "ц"
+        ],
+        "shifted": [
+          "Ц"
+        ]
+      }
+    ],
+    [
+      {
+        "default": [
+          "ь"
+        ],
+        "shifted": [
+          "Ь"
+        ]
+      },
+      {
+        "default": [
+          "я"
+        ],
+        "shifted": [
+          "Я"
+        ]
+      },
+      {
+        "default": [
+          "а"
+        ],
+        "shifted": [
+          "А"
+        ]
+      },
+      {
+        "default": [
+          "о"
+        ],
+        "shifted": [
+          "О"
+        ]
+      },
+      {
+        "default": [
+          "ж"
+        ],
+        "shifted": [
+          "Ж"
+        ]
+      },
+      {
+        "default": [
+          "г"
+        ],
+        "shifted": [
+          "Г"
+        ]
+      },
+      {
+        "default": [
+          "т"
+        ],
+        "shifted": [
+          "Т"
+        ]
+      },
+      {
+        "default": [
+          "н"
+        ],
+        "shifted": [
+          "Н"
+        ]
+      },
+      {
+        "default": [
+          "в"
+        ],
+        "shifted": [
+          "В"
+        ]
+      },
+      {
+        "default": [
+          "м"
+        ],
+        "shifted": [
+          "М"
+        ]
+      },
+      {
+        "default": [
+          "ч"
+        ],
+        "shifted": [
+          "Ч"
+        ]
+      }
+    ],
+    [
+      {
+        "special": "shift"
+      },
+      {
+        "default": [
+          "ю"
+        ],
+        "shifted": [
+          "Ю"
+        ]
+      },
+      {
+        "default": [
+          "й"
+        ],
+        "shifted": [
+          "Й"
+        ]
+      },
+      {
+        "default": [
+          "ъ"
+        ],
+        "shifted": [
+          "Ъ"
+        ]
+      },
+      {
+        "default": [
+          "ф"
+        ],
+        "shifted": [
+          "Ф"
+        ]
+      },
+      {
+        "default": [
+          "х"
+        ],
+        "shifted": [
+          "Х"
+        ]
+      },
+      {
+        "default": [
+          "п"
+        ],
+        "shifted": [
+          "П"
+        ]
+      },
+      {
+        "default": [
+          "р"
+        ],
+        "shifted": [
+          "Р"
+        ]
+      },
+      {
+        "default": [
+          "л"
+        ],
+        "shifted": [
+          "Л"
+        ]
+      },
+      {
+        "default": [
+          "б"
+        ],
+        "shifted": [
+          "Б"
+        ]
+      },
+      {
+        "special": "backspace"
+      }
+    ]
+  ],
+  "spacebarRow": [
+    {
+      "special": "language"
+    },
+    {
+      "special": "alt"
+    },
+    {
+      "default": [
+        ",",
+        "„",
+        "“",
+        "'",
+        "\"",
+        ":",
+        ";",
+        "/"
+      ],
+      "email": [
+        "@"
+      ],
+      "shifted": [
+        ",",
+        "„",
+        "“",
+        "'",
+        "\"",
+        ":",
+        ";",
+        "/"
+      ]
+    },
+    {
+      "special": "space"
+    },
+    {
+      "default": [
+        ".",
+        "?",
+        "!",
+        "&",
+        "(",
+        ")"
+      ],
+      "email": [
+        "."
+      ],
+      "shifted": [
+        ".",
+        "?",
+        "!",
+        "&",
+        "(",
+        ")"
+      ]
+    },
+    {
+      "special": "enter"
+    }
+  ]
+}

@@ -22,7 +22,7 @@ for code in "$@"; do
   rm -rf "$out" "build/languages/$code.rcc"
   mkdir -p "$out"
   cp "$src/language.conf" "$out/"
-  [ -f "$src/keymap.conf" ] && cp "$src/keymap.conf" "$out/"
+  for f in "$src"/keymap*.conf; do [ -f "$f" ] && cp "$f" "$out/"; done   # keymap@<method>= files too
   [ -d "$src/dict" ] && mkdir -p "$out/dict" && cp "$src"/dict/* "$out/dict/"
   [ -d "$src/fonts" ] && mkdir -p "$out/fonts" && cp "$src"/fonts/* "$out/fonts/"
   [ -f "$src/LICENSE-fonts" ] && cp "$src/LICENSE-fonts" "$out/"
@@ -45,5 +45,20 @@ for code in "$@"; do
     (cd build/languages && $RCC --binary --no-compress "$code.qrc" -o "$code.rcc")
     rm -f "$qrc"
   fi
+  # Layouts of one input method (keyboards@<method>/<layout>/): <code>/keyboards@<method>.rcc in the /home part,
+  # registered by the core over <code>.rcc while that method is chosen.
+  for kd in "$src"/keyboards@*/; do
+    [ -d "$kd" ] || continue
+    m=$(basename "$kd")
+    qrc=build/languages/$code/$m.qrc
+    { echo '<RCC><qresource prefix="/">'
+      for f in "$kd"*/keyboard_layout.json; do
+        l=$(basename "$(dirname "$f")")
+        echo "<file alias=\"misc/keyboards/$l/keyboard_layout.json\">../../../$src/$m/$l/keyboard_layout.json</file>"
+      done
+      echo '</qresource></RCC>'; } > "$qrc"
+    (cd "build/languages/$code" && $RCC --binary --no-compress "$m.qrc" -o "$m.rcc")
+    rm -f "$qrc"
+  done
   echo "built $out$( [ -f build/languages/$code.rcc ] && echo " + build/languages/$code.rcc")"
 done

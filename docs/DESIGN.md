@@ -310,7 +310,8 @@ time (`default=1` preselects it; Korean has it). Adding a language = adding a fo
 languages/<code>/
   language.conf            # manifest (required)
   keyboards/<layout>/keyboard_layout.json   # on-screen layouts, xochitl format (optional)
-  keymap.conf              # physical-keyboard map (optional)
+  keyboards@<method>/<layout>/keyboard_layout.json   # on-screen layouts of one input method (optional, core 0.3.3)
+  keymap.conf              # physical-keyboard map (optional; keymap@<method>= names another file per method)
   fonts/                   # font files shipped as they are (optional; OFL or similar)
   fonts.conf               # fonts downloaded at package build time (optional)
   LICENSE-fonts            # license text of the fonts (required when fonts/ or fonts.conf is present)
@@ -351,12 +352,22 @@ convert_map=               # Hangul -> reading table for kana / pinyin; ja: dict
 convert_simplify=          # Traditional -> Simplified table for the candidates (zh hanja method)
 methods=                   # input methods the user can choose, first = default (zh: hangul pinyin hanja)
 method_name.<m>=           # how Settings names method <m>; key@<m>= overrides key for that method
+keymap=keymap.conf         # physical-keyboard map file; keymap@<m>= one per input method (bg: keymap-phonetic.conf)
 method_toggle=             # a method that is an on/off option on top of the first (ko: old) -> a switch in Settings
 method_description=        # text under that switch
 requires=                  # add-ons this one needs, comma list (ja, zh: ko, whose layout they type on); the
                            # packages depend on rmpp-lang-<code> and the installer selects them too
 keyboard_default=1         # 0 = keyboard off until the user turns it on (ja, zh)
 ```
+
+**A layout per input method** (core 0.3.3; bg: BDS and phonetic). xochitl names an on-screen layout by its locale
+(`QLocale(id).language()`), so a second id such as `bg_BG_phonetic` shows up as a second, identical "Bulgarian"
+entry in Settings > Language & keyboard. Instead the add-on has one id (`layouts=bg_BG`): `keyboards/bg_BG/` is the
+default method's layout (in `<code>.rcc`, registered at startup), `keyboards@phonetic/bg_BG/` is built into
+`<code>/keyboards@phonetic.rcc` in the /home part. While that method is chosen the core registers the overlay and
+registers `<code>.rcc` again behind it (Qt serves a file from the first registered resource that has it), so the
+method chosen in Settings > Languages switches the physical keys (`keymap@<m>=`) and the on-screen keyboard together.
+At boot /home is not mounted yet: the overlay follows within seconds, before the keyboard is first shown.
 
 Script names: `Latin Greek Cyrillic Armenian Hebrew Arabic Devanagari Bengali Thai Lao Georgian Hangul Hiragana
 Katakana Bopomofo Han Ethiopic Khmer Mongolian Tibetan` (`QChar::Script_<name>`; unknown names are ignored).

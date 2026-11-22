@@ -712,6 +712,20 @@ void applyInput(const char *why) {
     }
 }
 
+} // namespace
+// xochitl parses a layout when the keyboard's language is set; selecting it again in Language & keyboard reloads
+// it. Do the same: another language, then this one again (in one event, before anything is painted).
+void rmpplang::reloadScreenLayout(const QStringList &layouts) {
+    QObject *vk = findVirtualKeyboard();
+    if (!vk) return;
+    const QString cur = vk->property("language").toString();
+    if (!layouts.contains(cur)) return;
+    const QString other = cur == g_latinLanguage ? QStringLiteral("en_US") : g_latinLanguage;
+    const bool ok = vk->setProperty("language", other) && vk->setProperty("language", cur);
+    qWarning("[rmpp-lang] on-screen keyboard %s reloaded: %s", qPrintable(cur), ok ? "ok" : "FAILED");
+}
+namespace {
+
 // Follow the globe key: when the on-screen language changes, the physical keyboard follows.
 void followScreenLanguage() {
     QObject *vk = findVirtualKeyboard();

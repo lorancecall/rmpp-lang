@@ -16,6 +16,7 @@ rmpp-lang is a small core plus one add-on per language. You pick the languages i
 |---|---|---|
 | `ko` Korean (with Old Hangul / 옛한글) | 2-beolsik on screen; Hangul composed from physical keys too; Hanja; Old Hangul | Noto Sans KR |
 | `ru` Russian | ЙЦУКЕН on screen and on physical keyboards | reMarkable's own (covers Cyrillic) |
+| `bg` Bulgarian | BDS 5237:2006 or phonetic (chosen in Settings), on screen and on physical keyboards; Ѝ by long press on И, „ “ on the comma key | reMarkable's own (covers Cyrillic) |
 | `ja` Japanese | romaji (nihongo -> 日本語); also by sound in Hangul (니혼고 -> 日本語) | Noto Sans JP |
 | `zh` Chinese | pinyin (zhongguo -> 中国); also by sound in Hangul (중궈 -> 中国) or Korean Hanja readings (중국 -> 中国) | Noto Sans SC |
 

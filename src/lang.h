@@ -22,6 +22,10 @@ QString inputMethod(const QString &code);        // layout | compose:<name> | no
 QString screenLayoutFor(const QString &code);    // on-screen layout id of a language ("" = none)
 QString inputForScreenLayout(const QString &layout);
 
+// The on-screen keyboard reads a layout once, when its language is set: after a language's layouts changed
+// (keyboards@<method>), show it again if it is on screen (hangul.cpp).
+void reloadScreenLayout(const QStringList &layouts);
+
 // Hangul composition (hangul.cpp), used by add-ons with input=compose:hangul: started once at startup.
 void hangulInit();
 
