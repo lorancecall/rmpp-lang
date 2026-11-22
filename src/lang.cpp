@@ -65,7 +65,12 @@ const QString kProbeOut = QStringLiteral("/tmp/rmpp-lang-probe.txt");
 const QString kFontRoot = QStringLiteral("/home/root/.local/share/fonts/rmpp-lang");
 
 const QString kAddonRoot = QStringLiteral("/home/root/.local/share/rmpp-lang/languages");   // manifests, keymaps, fonts
-const QString kAddonRcc = QStringLiteral("/usr/lib/rmpp-lang/languages");                 // <code>.rcc (layouts)
+// <code>.rcc (layouts): "languages" next to rmpp-lang.rcc, so /usr/lib/rmpp-lang/languages for hand-made installs
+// and the Vellum share folder in /home for packages (which set RMPPLANG_RCC).
+QString addonRccDir() {
+    const QString rcc = qEnvironmentVariable("RMPPLANG_RCC", QStringLiteral("/usr/lib/rmpp-lang/rmpp-lang.rcc"));
+    return QFileInfo(rcc).absolutePath() + QStringLiteral("/languages");
+}
 
 // A language: built into the core (ko, en, latin) or an add-on described by languages/<code>/language.conf.
 struct Lang {
@@ -234,7 +239,7 @@ qint64 addonStamp() {
 
 // On-screen layouts of add-ons: registered at startup (they must exist when xochitl reads its keyboard list).
 void registerAddonLayouts() {
-    for (const QFileInfo &fi : QDir(kAddonRcc).entryInfoList({QStringLiteral("*.rcc")}, QDir::Files)) {
+    for (const QFileInfo &fi : QDir(addonRccDir()).entryInfoList({QStringLiteral("*.rcc")}, QDir::Files)) {
         const bool ok = QResource::registerResource(fi.absoluteFilePath());
         qWarning("[rmpp-lang] layouts %s: %s", qPrintable(fi.fileName()), ok ? "registered" : "FAILED");
     }

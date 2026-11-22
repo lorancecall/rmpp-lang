@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build a language add-on the way the package build does (docs/DESIGN.md, "Language add-ons"):
 #   build/languages/<code>/      -> /home/root/.local/share/rmpp-lang/languages/<code>/ on the tablet
-#   build/languages/<code>.rcc   -> /usr/lib/rmpp-lang/languages/<code>.rcc (only when keyboards/ exists)
+#   build/languages/<code>.rcc   -> languages/<code>.rcc next to rmpp-lang.rcc (only when keyboards/ exists)
 # Usage: sh tools/build-addon.sh CODE...      (fonts.conf downloads are checked against their SHA-256)
 set -e
 cd "$(dirname "$0")/.."
