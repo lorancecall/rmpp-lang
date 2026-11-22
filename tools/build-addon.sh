@@ -26,6 +26,7 @@ for code in "$@"; do
   [ -d "$src/dict" ] && mkdir -p "$out/dict" && cp "$src"/dict/* "$out/dict/"
   [ -d "$src/fonts" ] && mkdir -p "$out/fonts" && cp "$src"/fonts/* "$out/fonts/"
   [ -f "$src/LICENSE-fonts" ] && cp "$src/LICENSE-fonts" "$out/"
+  [ -f "$src/glyphs.rmgl" ] && cp "$src/glyphs.rmgl" "$out/"   # stroke glyphs (tools/glyphs/glyphs.py)
   if [ -f "$src/fonts.conf" ]; then
     mkdir -p "$out/fonts"
     grep -v '^\s*#' "$src/fonts.conf" | while read -r url sum name; do

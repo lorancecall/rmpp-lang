@@ -415,6 +415,55 @@ license. Files: the folder minus `keyboards/` and `fonts.conf`, plus downloaded 
 `<code>.rcc`. postinstall/postupgrade/reenable copy the rcc to `/usr/lib/rmpp/rmpp-lang/languages/`, postinstall
 runs `rmpp-lang lang on <code>`; xochitl restarts only when a layout was added or removed; preremove deletes the rcc.
 
+## Glyph files
+
+Pen strokes for text that rmpp-hwr writes on a page as ink (text objects, Convert to ink): each add-on can ship
+`glyphs.rmgl`, the centre lines of its font, so packages that draw text depend on rmpp-lang instead of carrying
+fonts. Built by `tools/glyphs/glyphs.py build <code>` from the manifest's `glyph_font=` (a name in
+`tools/glyphs/fonts.conf`: pinned google/fonts URL, SHA-256, OFL notice) and `glyph_chars=` (character sets, below),
+and committed: CJK files take long to build and change only with the font or the character sets. The method is
+rmpp-hwr's `ink/glyphs.py` (render at 160 px, Zhang-Suen thinning, skeleton graph, spur removal, joining straight
+continuations, Ramer-Douglas-Peucker), so the strokes match its `glyphs.json`.
+
+On the tablet: `/home/root/.local/share/rmpp-lang/languages/<code>/glyphs.rmgl` (part of the add-on's files,
+installed and removed with `rmpp-lang-<code>`). rmpp-hwr looks a character up in the file of the text's language
+(state.json order), then in the other add-ons' files, then in its own `glyphs.json` (ASCII, KS X 1001 Hangul).
+The files are mapped and searched per character, so their size costs disk space in /home, not memory. A full
+build of all five takes about ten minutes on a PC (`--jobs` = cores).
+
+| Add-on | glyph_font | glyph_chars | Glyphs | Size |
+|---|---|---|---|---|
+| ko | NotoSansKR | `ksx1001,hangul,punct` | 17,023 | 3.8 MB |
+| ja | NotoSansJP | `kana,jisx0208,punct` | 6,901 | 2.0 MB |
+| zh | NotoSansSC | `gb2312,punct` | 7,461 | 2.0 MB |
+| ru, bg | NotoSans | `cyrillic,punct` | 172 | 21 KB |
+
+Character sets: `ascii`, `punct` (common non-ASCII punctuation), `cyrillic` (U+0400-045F, U+0490-04BF), `gb2312`
+(GB 2312 symbols and 6,763 hanzi), `kana`, `jisx0208` (JIS X 0208: symbols, kana, level 1-2 kanji), `ksx1001`
+(KS X 1001: symbols, jamo, 2,350 Hangul, 4,888 hanja), `hangul` (11,172 syllables + compatibility jamo),
+`U+XXXX-YYYY`. Characters the font lacks are left out; whitespace is left out except the space (advance only).
+
+Format `RMGL` version 1 (agreed with rmpp-hwr, which has the C++ reader; `glyphs.py` has `read_rmgl` / `write_rmgl`),
+little-endian, made to be mapped and searched without parsing:
+
+| Offset | Type | Field |
+|---|---|---|
+| 0 | char[4] | `RMGL` |
+| 4 | u16 | version (1) |
+| 6 | u16 | flags (0) |
+| 8 | u32 | glyph count N |
+| 12 | f32 | baseline (em, y down; 0.82) |
+| 16 | u32 | metadata length M |
+| 20 | u8[M] | metadata: UTF-8 JSON `{"lang", "font", "notice", "chars", "source"}` |
+| 20+M, padded to 4 | N x `{u32 codepoint, u32 offset}` | index, sorted by codepoint; offset from the file start |
+
+- Glyph: `u16 advance`, `u8 stroke count`, then per stroke `u8 point count` and that many `{i16 x, i16 y}`; all
+  lengths in em x 4096, y down, 0 = top of the em box, x from the pen position (as rmpp-hwr's glyphs.json). A stroke
+  of more than 255 points is split into runs that share their joining point. The space has no strokes.
+- `notice` is the font's OFL attribution, which travels with the strokes (they are derived from the font).
+- Thinning removes small dots entirely (·, …): the builder adds a short stroke at the centre of every ink
+  component left without a skeleton pixel (not done by rmpp-hwr's `ink/glyphs.py` today).
+
 ## Settings > Languages
 
 A sidebar row "Languages" (page id 1003; rmpp-bt 1000, rmpp-hwr 1001, rmpp-tailscale 1002).
