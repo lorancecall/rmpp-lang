@@ -646,31 +646,34 @@ QQuickItem *findByClassPrefix(QQuickItem *root, const char *prefix, int depth = 
     return nullptr;
 }
 
-void syncBar() {
-    for (QWindow *w : QGuiApplication::allWindows()) {
-        auto *qw = qobject_cast<QQuickWindow *>(w);
-        if (!qw) continue;
-        QQuickItem *bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
-        if (!bar || bar->property("_hanjaBar").toBool()) continue;
-        bar->setProperty("_hanjaBar", true);
-        QQmlEngine *eng = qmlEngine(bar);
-        if (!eng) continue;
-        auto *ctx = new QQmlContext(eng->rootContext(), bar);
-        ctx->setContextProperty(QStringLiteral("hanja"), g_map);
-        QQmlComponent comp(eng);
-        comp.setData(QByteArray(kHanjaQml), QUrl(QStringLiteral("qrc:/hanja/HanjaBar.qml")));
-        QObject *o = comp.beginCreate(ctx);
-        auto *item = qobject_cast<QQuickItem *>(o);
-        if (!item) {
-            for (const auto &e : comp.errors()) qWarning("[hanja] %s", qPrintable(e.toString()));
-            delete o;
-            continue;
-        }
-        item->setParentItem(bar);
-        item->setParent(bar);
-        comp.completeCreate();
-        qWarning("[hanja] button added to the format bar");
+void attachBar(QQuickItem *bar, const char *where) {
+    if (!bar || bar->property("_hanjaBar").toBool()) return;
+    QQmlEngine *eng = qmlEngine(bar);
+    if (!eng) return;
+    bar->setProperty("_hanjaBar", true);
+    auto *ctx = new QQmlContext(eng->rootContext(), bar);
+    ctx->setContextProperty(QStringLiteral("hanja"), g_map);
+    QQmlComponent comp(eng);
+    comp.setData(QByteArray(kHanjaQml), QUrl(QStringLiteral("qrc:/hanja/HanjaBar.qml")));
+    QObject *o = comp.beginCreate(ctx);
+    auto *item = qobject_cast<QQuickItem *>(o);
+    if (!item) {
+        for (const auto &e : comp.errors()) qWarning("[hanja] %s", qPrintable(e.toString()));
+        delete o;
+        return;
     }
+    item->setParentItem(bar);
+    item->setParent(bar);
+    comp.completeCreate();
+    qWarning("[hanja] button added to the %s", where);
+}
+
+// The format bar of notebooks, and rmpp-lang's own bar over keyboards that have none (hangul.cpp).
+void syncBar() {
+    for (QWindow *w : QGuiApplication::allWindows())
+        if (auto *qw = qobject_cast<QQuickWindow *>(w))
+            attachBar(findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard"), "format bar");
+    attachBar(rmpplang::keyboardBar(), "keyboard bar");
 }
 
 void onCommand(const QString &cmd) {
@@ -682,6 +685,8 @@ void onCommand(const QString &cmd) {
 }
 
 } // namespace
+
+QObject *rmpplang::hanjaState() { return g_map; }
 
 void rmpplang::hanjaInit() {
     auto *app = QCoreApplication::instance();

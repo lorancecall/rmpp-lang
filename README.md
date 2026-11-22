@@ -47,7 +47,8 @@ has **rmpp setup**, the installer for all rmpp add-ons.
 
 - **Settings > Languages** (above Handwriting): the installed languages in keyboard order (▲▼ to reorder), and a
   page per language to turn its keyboard on or off and choose its font, with a sample line.
-- **On-screen keyboard:** turn the language on in Settings > Language & keyboard, then switch with the globe key.
+- **On-screen keyboard:** turn the language on in Settings > Language & keyboard, then switch with the language
+  key (bottom left, where the globe key was).
   Korean jamo join into syllables as you type (ㅎ ㅏ ㄴ → 한); backspace removes one jamo at a time; Shift gives
   ㅃ ㅉ ㄸ ㄲ ㅆ ㅒ ㅖ.
 - **Type Folio, Bluetooth and USB keyboards:** **Ctrl+Space** or **right Alt / right Cmd** cycles through English
@@ -63,8 +64,10 @@ has **rmpp setup**, the installer for all rmpp add-ons.
 - **Chinese:** switch to Chinese (中) and type pinyin: `zhongguo`, then Space (or **汉**) converts to 中国, with
   predictions. Also supported: Mandarin by sound in Hangul (중궈 -> 中国, 베이징 -> 北京) or Korean Hanja readings
   (중국 -> 中国 / 中國). Choose in Settings > Languages > Chinese > Input.
-- **Indicator:** a button on the format bar above the keyboard shows the current language (EN, 한, RU, ...); tap
-  it to switch.
+- **Language key:** the bottom-left key of the on-screen keyboard shows the current language (EN, 한, RU, ...);
+  tap it to switch, in Settings > Languages order. It is the same in every text field, with or without the format
+  bar. In fields without the format bar (text objects, dialogs) a bar of the same kind appears above the keys while
+  the language needs it: 漢 / 変 / 汉 and their candidates, 옛.
 - **External keyboards:** while a Bluetooth or USB keyboard is connected, the on-screen keys fold away and the
   format bar stays. With [rmpp-bt](https://github.com/lorancecall/rmpp-bt) you can set a keyboard to **Type Folio
   mode** instead.
