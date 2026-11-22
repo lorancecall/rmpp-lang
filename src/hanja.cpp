@@ -541,7 +541,7 @@ Item {
     // Cells as wide as their word (食べます, 中国人), pages filled greedily to the room on the bar.
     FontMetrics { id: fm; font.pixelSize: 32 }
     function cellWidth(c) { return Math.min(420, Math.max(144, Math.ceil(fm.advanceWidth(c.h)) + 32)); }
-    readonly property real room: Math.max(300, width - 112 - 76 - 12 - 16 - 2 * (56 + 6))
+    readonly property real room: Math.max(300, width - 152 - 76 - 12 - 16 - 2 * (56 + 6))
     readonly property var pages: {
         const out = [0];
         let used = 0;
@@ -562,7 +562,8 @@ Item {
     Rectangle {
         id: button
         width: 76; height: 56; radius: 10
-        anchors.right: parent.right; anchors.rightMargin: 112
+        // 152: about 30 px clear of the close button's press outline (108 px wide, from x 1498 on a 1620 px bar)
+        anchors.right: parent.right; anchors.rightMargin: 152
         anchors.verticalCenter: parent.verticalCenter
         visible: !!hanja.available
         color: hanja.open ? "white" : "black"

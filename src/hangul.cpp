@@ -766,7 +766,7 @@ Item {
     ]
     Rectangle {
         width: 76; height: 56; radius: 10
-        anchors.right: parent.right; anchors.rightMargin: 200
+        anchors.right: parent.right; anchors.rightMargin: 240
         anchors.verticalCenter: parent.verticalCenter
         color: root.open ? "white" : "black"
         border.color: "white"; border.width: 2
