@@ -10,6 +10,10 @@ and keeps working after a reboot.
 
 Tested on reMarkable Paper Pro, OS 3.29.1.
 
+> Part of the **rmpp add-ons**, built on [rmpp-packages](https://github.com/lorancecall/rmpp-packages): it is
+> installed by rmpp setup, loaded into xochitl at every boot by rmpp-preload (no xovi), and kept up to date with
+> Vellum. How that differs from xovi: [how it works](https://github.com/lorancecall/rmpp-packages/blob/main/docs/how-it-works.md).
+
 rmpp-lang is a small core plus one add-on per language. You pick the languages in the installer:
 
 | Add-on | Keyboard | Font (default) |
@@ -26,27 +30,12 @@ English is always there. More languages are welcome: see [Add a language](docs/F
 
 ## Install
 
-Use the installer from [rmpp-packages](https://github.com/lorancecall/rmpp-packages). It installs Vellum if needed,
-then rmpp-lang with the languages you select (Korean is preselected).
-
-**Windows (PowerShell):**
-
-```powershell
-irm https://lorancecall.github.io/rmpp-packages/install-rmpp.ps1 -OutFile install-rmpp.ps1
-powershell -ExecutionPolicy Bypass -File install-rmpp.ps1
-```
-
-**Linux / macOS:**
-
-```sh
-curl -fsSL https://lorancecall.github.io/rmpp-packages/install-rmpp.sh -o install-rmpp.sh
-sh install-rmpp.sh
-```
-
-You need developer mode turned on. The installer asks for the tablet's root password once (Settings > General >
-Help > About > Copyrights and licenses). If you already use Vellum, add the repository and run
-`vellum add rmpp-lang rmpp-lang-ko` (one `rmpp-lang-<code>` per language). After a reMarkable OS update, run the
-installer again (or `vellum reenable`).
+- Install **rmpp setup** (desktop app or one-line script) from
+  [rmpp-packages](https://github.com/lorancecall/rmpp-packages#install) and tick **Languages** (selected by default,
+  with Korean), then the languages you want. Developer mode is needed: the rmpp-packages page explains it.
+- After a reMarkable OS update: **Restore** in rmpp setup.
+- Other ways (Vellum on the command line, building and installing it yourself) and removal:
+  [docs/install.md](docs/install.md).
 
 ## Use
 
@@ -113,23 +102,7 @@ packages put these files back with `vellum reenable`. Design, add-on format and 
 
 ## Build
 
-Requires an aarch64 cross toolchain (Arm GNU `aarch64-none-linux-gnu`, GCC 14), Qt 6.10 headers (QtCore, QtGui,
-QtQml, QtQuick), the device's Qt libraries to link against, and `pyside6-rcc`.
-
-```sh
-SDK=/path/to/sdk sh build.sh           # build/librmpp-lang.so, build/rmpp-lang.rcc, build/rmpp-lang
-sh tools/build-addon.sh ko ru          # build/languages/<code>/ and build/languages/<code>.rcc
-ADDONS="ko ru" sh deploy.sh rmpp       # development install over ssh (host alias "rmpp")
-sh deploy.sh rmpp --remove             # remove it again
-```
-
-Each add-on also carries `glyphs.rmgl`, pen strokes of its font for text written as ink (rmpp-textobj, rmpp-hwr);
-every non-ASCII glyph lives in these files. They are committed; rebuild one after changing its `glyph_font` /
-`glyph_chars` (needs Python with numpy, Pillow, fontTools):
-`python3 tools/glyphs/glyphs.py build zh` (see "Glyph files" in DESIGN.md).
-
-Never run `systemctl stop xochitl` on the device: stopping it powers the tablet off. More than four xochitl
-restarts in ten minutes reboots it; `deploy.sh` runs `systemctl reset-failed xochitl` first.
+Building, the development install and the glyph files: [docs/install.md](docs/install.md#build-and-install-by-hand).
 
 ## History
 
