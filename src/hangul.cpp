@@ -747,7 +747,7 @@ void followScreenLanguage() {
     applyInput("screen");
 }
 
-// Old Hangul palette: a "옛" button left of the conversion button; it opens rows of old letters above the bar.
+// Old Hangul palette: a "옛" button left of the conversion button (same place on both bars); it opens rows of old letters above the bar.
 // A tap sends the letter to the text field like a key, so the Hangul engine composes it (initials, vowels, finals);
 // 방점 (U+302E one dot, U+302F two dots) go in as they are, after the syllable.
 const char *kOldQml = R"QML(
@@ -766,7 +766,7 @@ Item {
     ]
     Rectangle {
         width: 76; height: 56; radius: 10
-        anchors.right: parent.right; anchors.rightMargin: 288
+        anchors.right: parent.right; anchors.rightMargin: 200
         anchors.verticalCenter: parent.verticalCenter
         color: root.open ? "white" : "black"
         border.color: "white"; border.width: 2
@@ -1076,7 +1076,7 @@ Item {
 
     Rectangle {
         id: key
-        visible: k.shown && !!hangul.enabled && !(k.vk && k.vk.symbolsSelected && k.globe)
+        visible: k.shown && !!hangul.enabled
         readonly property bool onGlobe: k.globe
         width: onGlobe ? 0.92 * k.unit : 76 * k.s; height: (onGlobe ? 104 : 56) * k.s; radius: 10 * k.s
         x: onGlobe ? k.width / 2 - 5 * k.unit - width / 2 : k.width - width - 24 * k.s
