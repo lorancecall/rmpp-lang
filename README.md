@@ -2,13 +2,16 @@
 
 ![Typing Korean on the Paper Pro: jamo compose into 한국어, 漢 turns it into 韓國語, a swipe types the Old Hangul ㆍ](docs/rmpp-lang-demo.gif)
 
-*Korean on the on-screen keyboard: Hangul, Hanja conversion and Old Hangul (recorded on the tablet with [rmpp-studio](https://github.com/lorancecall/rmpp-studio)).*
+*Korean on the on-screen keyboard: Hangul, Hanja conversion and Old Hangul (recorded on the Paper Pro with [rmpp-studio](https://github.com/lorancecall/rmpp-studio)).*
 
 Languages for the reMarkable Paper Pro: a keyboard and a font for each language (Korean with Old Hangul, Japanese,
 Chinese, Russian, ...), on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs without xovi
 and keeps working after a reboot.
 
 Tested on reMarkable Paper Pro, OS 3.29.1.
+
+Made for and tested on the reMarkable Paper Pro with OS 3.29 only; other reMarkable models are not supported and
+their compatibility is not guaranteed. Following newer OS versions happens when I have time, and may not happen.
 
 > Part of the **rmpp add-ons**, built on [rmpp-packages](https://github.com/lorancecall/rmpp-packages): it is
 > installed by rmpp setup, loaded into xochitl at every boot by rmpp-preload (no xovi), and kept up to date with
@@ -69,10 +72,10 @@ has **rmpp setup**, the installer for all rmpp add-ons.
 ## Fonts
 
 Each language uses one font everywhere its script appears: typed text, the keyboard, file names and the rest of
-the tablet. Fonts change at once, without a restart. The defaults are the Noto fonts that come with the tablet.
+the Paper Pro. Fonts change at once, without a restart. The defaults are the Noto fonts that come with the Paper Pro.
 
 Add your own (`.ttf`, `.otf`, `.ttc`) from your computer with [tools/rmpp-lang.py](tools/rmpp-lang.py), or on the
-tablet:
+Paper Pro:
 
 ```sh
 rmpp-lang font add /home/root/MyFont-Regular.ttf --lang ko --use
@@ -100,7 +103,7 @@ xochitl starts seconds before the encrypted `/home` is mounted, so what it needs
 `rmpp-lang.rcc`, the add-ons' layouts) is on the root file system, in one folder: `/usr/lib/rmpp/rmpp-lang/`,
 with the `rmpp-lang` command. Settings, fonts and the add-ons' data are in `/home` (`/home/root/.config/rmpp-lang`,
 `/home/root/.local/share`). The root file system is read-only and an OS update replaces it, which is why the
-packages put these files back with `vellum reenable`. Design, add-on format and tablet findings:
+packages put these files back with `vellum reenable`. Design, add-on format and Paper Pro findings:
 [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Build

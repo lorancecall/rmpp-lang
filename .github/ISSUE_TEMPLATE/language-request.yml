@@ -64,7 +64,7 @@ body:
     id: fonts
     attributes:
       label: Fonts
-      description: Does the language need a font the tablet doesn't have? Name freely licensed fonts you'd like (e.g. a Noto family, with a link).
+      description: Does the language need a font the Paper Pro doesn't have? Name freely licensed fonts you'd like (e.g. a Noto family, with a link).
   - type: textarea
     id: example
     attributes:

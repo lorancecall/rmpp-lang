@@ -10,7 +10,7 @@ New keyboard languages and input methods are welcome, as an issue or as a pull r
 
 ## Rules for every new language
 
-1. **Tested on a real reMarkable Paper Pro.** Install the add-on on your tablet, type in a notebook, and check the
+1. **Tested on a real reMarkable Paper Pro.** Install the add-on on your Paper Pro, type in a notebook, and check the
    keyboard, the font and Settings > Languages.
 2. **Screenshots made with [rmpp-studio](https://github.com/lorancecall/rmpp-studio)** (`rmpp-ctl shot out.png`):
    one of the on-screen keyboard and one of a typed sample sentence. Attach them to the issue or pull request.
