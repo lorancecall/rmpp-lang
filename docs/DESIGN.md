@@ -360,7 +360,7 @@ requires=                  # add-ons this one needs, comma list (ja, zh: ko, who
 keyboard_default=1         # 0 = keyboard off until the user turns it on (ja, zh)
 ```
 
-**A layout per input method** (core 0.3.3; bg: BDS and phonetic). xochitl names an on-screen layout by its locale
+**A layout per input method** (core 0.3.3; bg: BDS, new and traditional phonetic; `tools/bg-keyboards.py`). xochitl names an on-screen layout by its locale
 (`QLocale(id).language()`), so a second id such as `bg_BG_phonetic` shows up as a second, identical "Bulgarian"
 entry in Settings > Language & keyboard. Instead the add-on has one id (`layouts=bg_BG`): `keyboards/bg_BG/` is the
 default method's layout (in `<code>.rcc`, registered at startup), `keyboards@phonetic/bg_BG/` is built into
