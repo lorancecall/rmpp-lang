@@ -1,29 +1,57 @@
-# Installing rmpp-lang without rmpp setup
+# Installing rmpp-lang
 
-The usual way is **rmpp setup** from [rmpp-packages](https://github.com/lorancecall/rmpp-packages#install): see
-[Install](../README.md#install). This page covers the other ways and removal.
+The usual way is **rmpp setup** from [rmpp-packages](https://github.com/lorancecall/rmpp-packages#install), as the
+desktop app or the script: tick **Languages: keyboards and fonts per language**, then the languages you want. This
+page covers the rest. Steps that are the same for every rmpp add-on live in rmpp-packages and are linked here, not
+repeated.
 
-## With Vellum on the command line
+## Packages
 
-On the tablet (over SSH), with [Vellum](https://github.com/vellum-dev/vellum) already installed, add the
-rmpp-packages repository and its signing key:
+rmpp-lang is a core plus one package per language.
+
+| Package | Installs with it |
+|---|---|
+| `rmpp-lang` | `rmpp-preload` |
+| `rmpp-lang-ko` Korean | `rmpp-lang`, `rmpp-preload` |
+| `rmpp-lang-ja` Japanese | `rmpp-lang`, `rmpp-lang-ko` (typing Japanese by sound in Hangul), `rmpp-preload` |
+| `rmpp-lang-zh` Chinese | `rmpp-lang`, `rmpp-lang-ko` (typing Chinese in Hangul or Hanja readings), `rmpp-preload` |
+| `rmpp-lang-ru` Russian | `rmpp-lang`, `rmpp-preload` |
+| `rmpp-lang-bg` Bulgarian | `rmpp-lang`, `rmpp-preload` |
+
+Dependencies are installed automatically, in rmpp setup and with `vellum add`. All packages and what needs what:
+[packages.md](https://github.com/lorancecall/rmpp-packages/blob/main/docs/packages.md).
+
+## Without rmpp setup
+
+Follow [manual-install.md](https://github.com/lorancecall/rmpp-packages/blob/main/docs/manual-install.md) (Vellum
+and the rmpp package repository), then on the tablet, one `rmpp-lang-<code>` per language:
 
 ```sh
-wget -qO- https://lorancecall.github.io/rmpp-packages/install.sh | sh
+vellum add rmpp-lang-ko
+vellum add rmpp-lang-ja rmpp-lang-zh rmpp-lang-ru rmpp-lang-bg    # any of these
 ```
 
-Then install the core and one package per language:
+## Uninstall
 
-```sh
-vellum add rmpp-lang rmpp-lang-ko          # Korean
-vellum add rmpp-lang-ja rmpp-lang-zh       # Japanese, Chinese (they pull in rmpp-lang-ko for their Hangul input)
-vellum add rmpp-lang-ru rmpp-lang-bg       # Russian, Bulgarian
-```
+- **One language:** untick it in rmpp setup and press **Remove unticked installed**, or
+  `vellum del rmpp-lang-<code>`. Japanese and Chinese need `rmpp-lang-ko`: remove them before Korean.
+- **All of rmpp-lang:** untick **Languages** in rmpp setup and press **Remove unticked installed**, or remove the
+  language packages and the core together: `vellum del rmpp-lang-ko rmpp-lang` (add the other `rmpp-lang-<code>`
+  you have).
+- **What stays:** your settings in `/home/root/.config/rmpp-lang` (languages, order, fonts chosen), the folder
+  `/home/root/.local/share/rmpp-lang`, and fonts you added (`/home/root/.local/share/fonts/rmpp-lang`). Delete
+  them by hand to start fresh, or
+  use step 3 of [uninstall.md](https://github.com/lorancecall/rmpp-packages/blob/main/docs/uninstall.md).
+- **Everything rmpp, and before a factory reset:**
+  [uninstall.md](https://github.com/lorancecall/rmpp-packages/blob/main/docs/uninstall.md).
 
-- Updates: `vellum upgrade`.
-- After a reMarkable OS update: `vellum reenable`. The update replaces the root file system, which holds the core.
-- `rmpp-lang` replaces the old `rmpp-korean`: remove that one first (`vellum del rmpp-korean`); see
-  [MIGRATION.md](MIGRATION.md).
+## Next to other mods
+
+`rmpp-lang` cannot be installed next to `rmpp-korean` (its predecessor; they do the same): remove that one first
+(`vellum del rmpp-korean`; see [MIGRATION.md](MIGRATION.md)).
+
+It runs next to xovi and other Vellum packages:
+[how-it-works.md](https://github.com/lorancecall/rmpp-packages/blob/main/docs/how-it-works.md#next-to-other-mods).
 
 ## Build and install by hand
 
@@ -56,10 +84,3 @@ Each add-on also carries `glyphs.rmgl`, pen strokes of its font for text written
 every non-ASCII glyph lives in these files. They are committed; rebuild one after changing its `glyph_font` /
 `glyph_chars` (needs Python with numpy, Pillow, fontTools): `python3 tools/glyphs/glyphs.py build zh` (see
 "Glyph files" in [DESIGN.md](DESIGN.md)).
-
-## Removal
-
-- One language: `vellum del rmpp-lang-<code>`. All of rmpp-lang: the language packages and the core together,
-  for example `vellum del rmpp-lang-ko rmpp-lang`.
-- A development install: `sh deploy.sh rmpp --remove`.
-- All rmpp add-ons: **Remove everything** in rmpp setup (do this before a factory reset or handing the tablet on).
