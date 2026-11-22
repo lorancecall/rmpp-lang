@@ -3,6 +3,9 @@
 #include <QtCore/QString>
 #include <QtCore/QStringList>
 
+class QQuickItem;
+class QObject;
+
 namespace rmpplang {
 
 // Languages: en and latin are built in; all others are add-ons (/home/root/.local/share/rmpp-lang/languages/<code>/).
@@ -28,6 +31,7 @@ void reloadScreenLayout(const QStringList &layouts);
 
 // Hangul composition (hangul.cpp), used by add-ons with input=compose:hangul: started once at startup.
 void hangulInit();
+QQuickItem *keyboardBar();               // bar over keyboards without the format bar (hangul.cpp)
 
 // Conversion (hanja.cpp): an add-on's convert= kind ("hanja", "" = none) and the absolute path of its convert_dict.
 QString convertKind(const QString &code);
@@ -35,6 +39,7 @@ QString convertDict(const QString &code);
 QString convertMap(const QString &code);
 QString convertSimplify(const QString &code);     // Traditional -> Simplified table ("" = none)          // Hangul -> reading table (kana, pinyin); "" = none
 void hanjaInit();
+QObject *hanjaState();                   // the conversion state the QML binds to (hanja.cpp)
 bool tracing();                                   // `rmpp-lang probe trace on` (debug logs)
 
 } // namespace rmpplang

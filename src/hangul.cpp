@@ -15,6 +15,9 @@
 #include <QtGui/QInputMethod>
 #include <QtCore/QDateTime>
 #include <QtCore/QFile>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
 #include <QtCore/QTimer>
 #include <QtCore/QMetaMethod>
@@ -716,6 +719,11 @@ void applyInput(const char *why) {
 // xochitl parses a layout when the keyboard's language is set; selecting it again in Language & keyboard reloads
 // it. Do the same: another language, then this one again (in one event, before anything is painted).
 void rmpplang::reloadScreenLayout(const QStringList &layouts) {
+    if (g_state) {   // another input method's layout under the same id: measure its rows again
+        QVariantMap m = g_state->value(QStringLiteral("layoutUnits")).toMap();
+        for (const QString &l : layouts) m.remove(l);
+        g_state->insert(QStringLiteral("layoutUnits"), m);
+    }
     QObject *vk = findVirtualKeyboard();
     if (!vk) return;
     const QString cur = vk->property("language").toString();
@@ -739,28 +747,7 @@ void followScreenLanguage() {
     applyInput("screen");
 }
 
-// "한" / "EN" indicator on the bottom format bar, left of its close button; tap to switch.
-const char *kIndicatorQml = R"QML(
-import QtQuick
-Rectangle {
-    width: 76; height: 56; radius: 10
-    color: hangul.label !== "EN" ? "white" : "black"
-    border.color: "white"; border.width: 2
-    anchors.right: parent.right; anchors.rightMargin: 112
-    anchors.verticalCenter: parent.verticalCenter
-    z: 5
-    visible: !!hangul.enabled
-    Text {
-        anchors.centerIn: parent
-        text: hangul.label || "EN"
-        color: hangul.label !== "EN" ? "black" : "white"
-        font.pixelSize: 30; font.bold: true
-    }
-    MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: hangul.command = "toggle#" + Date.now() }
-}
-)QML";
-
-// Old Hangul palette: a "옛" button left of the conversion button; it opens rows of old letters above the bar.
+// Old Hangul palette: a "옛" button left of the conversion button (same place on both bars); it opens rows of old letters above the bar.
 // A tap sends the letter to the text field like a key, so the Hangul engine composes it (initials, vowels, finals);
 // 방점 (U+302E one dot, U+302F two dots) go in as they are, after the syllable.
 const char *kOldQml = R"QML(
@@ -779,7 +766,7 @@ Item {
     ]
     Rectangle {
         width: 76; height: 56; radius: 10
-        anchors.right: parent.right; anchors.rightMargin: 288
+        anchors.right: parent.right; anchors.rightMargin: 240
         anchors.verticalCenter: parent.verticalCenter
         color: root.open ? "white" : "black"
         border.color: "white"; border.width: 2
@@ -829,31 +816,33 @@ Item {
 }
 )QML";
 
-void syncOldPalette() {
-    for (QWindow *w : QGuiApplication::allWindows()) {
-        auto *qw = qobject_cast<QQuickWindow *>(w);
-        if (!qw) continue;
-        QQuickItem *bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
-        if (!bar || bar->property("_hangulOld").toBool()) continue;
-        bar->setProperty("_hangulOld", true);
-        QQmlEngine *eng = qmlEngine(bar);
-        if (!eng) continue;
-        auto *ctx = new QQmlContext(eng->rootContext(), bar);
-        ctx->setContextProperty(QStringLiteral("hangul"), g_state);
-        QQmlComponent comp(eng);
-        comp.setData(QByteArray(kOldQml), QUrl(QStringLiteral("qrc:/hangul/OldPalette.qml")));
-        QObject *o = comp.beginCreate(ctx);
-        auto *item = qobject_cast<QQuickItem *>(o);
-        if (!item) {
-            for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
-            delete o;
-            continue;
-        }
-        item->setParentItem(bar);
-        item->setParent(bar);
-        comp.completeCreate();
-        qWarning("[hangul] old Hangul palette added to the format bar");
+void attachOldPalette(QQuickItem *bar, const char *where) {
+    if (!bar || bar->property("_hangulOld").toBool()) return;
+    QQmlEngine *eng = qmlEngine(bar);
+    if (!eng) return;
+    bar->setProperty("_hangulOld", true);
+    auto *ctx = new QQmlContext(eng->rootContext(), bar);
+    ctx->setContextProperty(QStringLiteral("hangul"), g_state);
+    QQmlComponent comp(eng);
+    comp.setData(QByteArray(kOldQml), QUrl(QStringLiteral("qrc:/hangul/OldPalette.qml")));
+    QObject *o = comp.beginCreate(ctx);
+    auto *item = qobject_cast<QQuickItem *>(o);
+    if (!item) {
+        for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
+        delete o;
+        return;
     }
+    item->setParentItem(bar);
+    item->setParent(bar);
+    comp.completeCreate();
+    qWarning("[hangul] old Hangul palette added to the %s", where);
+}
+
+void syncOldPalette() {
+    for (QWindow *w : QGuiApplication::allWindows())
+        if (auto *qw = qobject_cast<QQuickWindow *>(w))
+            attachOldPalette(findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard"), "format bar");
+    attachOldPalette(rmpplang::keyboardBar(), "keyboard bar");
 }
 
 // A letter from the palette, typed into the focused field as if from the keyboard.
@@ -863,33 +852,6 @@ void insertOld(const QString &s) {
     QInputMethodEvent im;
     im.setCommitString(s);
     QCoreApplication::sendEvent(obj, &im);
-}
-
-void syncIndicator() {
-    for (QWindow *w : QGuiApplication::allWindows()) {
-        auto *qw = qobject_cast<QQuickWindow *>(w);
-        if (!qw) continue;
-        QQuickItem *bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
-        if (!bar || bar->property("_hangulBadge").toBool()) continue;
-        bar->setProperty("_hangulBadge", true);
-        QQmlEngine *eng = qmlEngine(bar);
-        if (!eng) continue;
-        auto *ctx = new QQmlContext(eng->rootContext(), bar);
-        ctx->setContextProperty(QStringLiteral("hangul"), g_state);
-        QQmlComponent comp(eng);
-        comp.setData(QByteArray(kIndicatorQml), QUrl(QStringLiteral("qrc:/hangul/Indicator.qml")));
-        QObject *o = comp.beginCreate(ctx);
-        auto *item = qobject_cast<QQuickItem *>(o);
-        if (!item) {
-            for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
-            delete o;
-            continue;
-        }
-        item->setParentItem(bar);
-        item->setParent(bar);
-        comp.completeCreate();
-        qWarning("[hangul] indicator added to the format bar");
-    }
 }
 
 // ---- old letters by swiping a key (with old_letters on) ----
@@ -1072,6 +1034,153 @@ void syncSwipeMarks() {
     qWarning("[hangul] swipe marks added over the keyboard");
 }
 
+// ---- the language key and the bar for keyboards without the format bar ----
+// One place for the language switch everywhere: a 한 / EN key over the keyboard's own globe key (bottom left;
+// xochitl shows it when Language & keyboard has two or more layouts). The globe key would cycle only xochitl's
+// layouts; this key cycles rmpp-lang's languages in Settings order and shows the current one. Without a globe key
+// (one layout) the key sits just above the keys, at the right. Where the globe key is depends on the layout
+// (measured on the Paper Pro, 1620 px keyboard, ko_KR / en_US and bg_BG): one key unit is about 1595 px divided by
+// the widest alphabetic row (Shift and Backspace count 2 units), the bottom row is 11 units centred, so the globe
+// key's centre is width / 2 - 5 units, 78 px above the bottom. layoutUnits() reads that row width from the layout.
+//
+// Keyboards opened without xochitl's format bar (rmpp-textobj's edit box, other add-ons' fields, dialogs) get a bar
+// of the same height above the keys while the language needs it (conversion button and candidates, 옛 palette):
+// hanja.cpp and the old palette attach to it as they attach to the format bar.
+const char *kKeyboardQml = R"QML(
+import QtQuick
+Item {
+    id: k
+    property Item vk
+    property Item bar                  // xochitl's format bar, once it exists
+    property bool secret: false        // a passcode / PIN field has the focus
+    property alias host: host
+    readonly property real s: vk ? vk.width / 1620 : 1
+    readonly property bool shown: !!vk && vk.visible && vk.height > 0 && !secret
+    readonly property bool noBar: !(bar && bar.visible && bar.height > 0)
+    readonly property bool globe: !!vk && (vk.languages || []).length > 1
+    readonly property real unit: 1595 * s / ((vk && (hangul.layoutUnits || {})[vk.language]) || 11)
+    x: vk ? vk.x : 0; y: vk ? vk.y : 0
+    width: vk ? vk.width : 0; height: vk ? vk.height : 0
+    z: 60
+
+    // the bar for keyboards without the format bar
+    Rectangle {
+        id: host
+        visible: k.shown && k.noBar && (!!hanja.available || !!hanja.open || !!hangul.old)
+        width: parent.width
+        height: k.bar && k.bar.height > 0 ? k.bar.height : 96 * k.s
+        y: -height
+        color: "black"
+        MouseArea { anchors.fill: parent }   // taps on the bar stay on the bar
+    }
+
+    Rectangle {
+        id: key
+        visible: k.shown && !!hangul.enabled
+        readonly property bool onGlobe: k.globe
+        width: onGlobe ? 0.92 * k.unit : 76 * k.s; height: (onGlobe ? 104 : 56) * k.s; radius: 10 * k.s
+        x: onGlobe ? k.width / 2 - 5 * k.unit - width / 2 : k.width - width - 24 * k.s
+        y: onGlobe ? k.height - 78 * k.s - height / 2
+                   : (host.visible ? -host.height : 0) - height - 12 * k.s
+        color: onGlobe ? "black" : (hangul.label !== "EN" ? "white" : "black")
+        border.color: onGlobe ? "black" : "white"; border.width: 2
+        Text {
+            anchors.centerIn: parent
+            text: hangul.label || "EN"
+            color: key.onGlobe || hangul.label === "EN" ? "white" : "black"
+            font.pixelSize: (key.onGlobe ? 34 : 30) * k.s; font.bold: true
+        }
+        MouseArea { anchors.fill: parent; anchors.margins: -6; onClicked: hangul.command = "toggle#" + Date.now() }
+    }
+}
+)QML";
+
+QPointer<QQuickItem> g_keyboardOverlay;
+
+// Width in key units of a layout's widest alphabetic row (keys 1, Shift / Backspace 2, or their "width"), following
+// "inherits" for layouts without their own rows. 0 when the layout cannot be read.
+double layoutUnits(const QString &lang, int depth = 0) {
+    if (lang.isEmpty() || depth > 3) return 0;
+    QFile f(QStringLiteral(":/misc/keyboards/") + lang + QStringLiteral("/keyboard_layout.json"));
+    if (!f.open(QIODevice::ReadOnly)) return 0;
+    const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+    const QJsonArray rows = o.value(QStringLiteral("alphabetic")).toArray();
+    if (rows.isEmpty()) return layoutUnits(o.value(QStringLiteral("inherits")).toString(), depth + 1);
+    double widest = 0;
+    for (const QJsonValue &r : rows) {
+        double w = 0;
+        for (const QJsonValue &kv : r.toArray()) {
+            const QJsonObject key = kv.toObject();
+            const QString sp = key.value(QStringLiteral("special")).toString();
+            const double dflt = (sp == QLatin1String("shift") || sp == QLatin1String("backspace")) ? 2 : 1;
+            w += key.value(QStringLiteral("width")).toDouble(dflt);
+        }
+        widest = qMax(widest, w);
+    }
+    return widest;
+}
+
+// Row widths of every layout the keyboard may show, for the QML (instant when the language changes).
+void syncLayoutUnits(const QString &current) {
+    QVariantMap m = g_state->value(QStringLiteral("layoutUnits")).toMap();
+    QStringList want{current, g_latinLanguage, QStringLiteral("en_US")};
+    for (const QString &code : rmpplang::inputCycle()) want << rmpplang::screenLayoutFor(code);
+    bool changed = false;
+    for (const QString &l : want) {
+        if (l.isEmpty() || m.contains(l)) continue;
+        const double u = layoutUnits(l);
+        m.insert(l, u > 0 ? u : 11);
+        qWarning("[hangul] layout %s: widest row %.1f units", qPrintable(l), u);
+        changed = true;
+    }
+    if (changed) g_state->insert(QStringLiteral("layoutUnits"), m);
+}
+
+void syncKeyboardOverlay() {
+    QQuickItem *panel = findKeyboardPanel();
+    QQuickItem *vk = panel ? findItemOfClass(panel, "VirtualKeyboard") : nullptr;
+    if (!vk || !vk->parentItem()) return;
+    syncLayoutUnits(vk->property("language").toString());
+    if (!g_keyboardOverlay) {
+        QQmlEngine *eng = qmlEngine(vk);
+        if (!eng) eng = qmlEngine(panel);
+        if (!eng) return;
+        auto *ctx = new QQmlContext(eng->rootContext(), vk);
+        ctx->setContextProperty(QStringLiteral("hangul"), g_state);
+        ctx->setContextProperty(QStringLiteral("hanja"), rmpplang::hanjaState());
+        QQmlComponent comp(eng);
+        comp.setData(QByteArray(kKeyboardQml), QUrl(QStringLiteral("qrc:/hangul/KeyboardOverlay.qml")));
+        QObject *o = comp.beginCreate(ctx);
+        auto *item = qobject_cast<QQuickItem *>(o);
+        if (!item) {
+            for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
+            delete o;
+            return;
+        }
+        item->setProperty("vk", QVariant::fromValue(vk));
+        item->setParentItem(vk->parentItem());
+        item->setParent(vk);
+        comp.completeCreate();
+        g_keyboardOverlay = item;
+        qWarning("[hangul] language key and keyboard bar added over the keyboard");
+    }
+    QQuickItem *bar = nullptr;
+    if (QQuickWindow *qw = vk->window()) bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
+    if (g_keyboardOverlay->property("bar").value<QQuickItem *>() != bar)
+        g_keyboardOverlay->setProperty("bar", QVariant::fromValue(bar));
+    // never on the passcode / PIN screens (as rmpp-textobj: class names with Passcode, Pincode, PinKeyboard)
+    bool secret = false;
+    for (QWindow *w : QGuiApplication::allWindows()) {
+        auto *qw = qobject_cast<QQuickWindow *>(w);
+        if (!qw || !qw->isVisible()) continue;
+        for (QQuickItem *i = qw->activeFocusItem(); i && !secret; i = i->parentItem()) {
+            const QByteArray c = i->metaObject()->className();
+            secret = c.contains("Passcode") || c.contains("Pincode") || c.contains("PinKeyboard");
+        }
+    }
+    if (g_keyboardOverlay->property("secret").toBool() != secret) g_keyboardOverlay->setProperty("secret", secret);
+}
+
 void init() {
     auto *app = QCoreApplication::instance();
     auto *filter = new HangulFilter(app);
@@ -1105,9 +1214,9 @@ void init() {
             applyInput("settings");
         syncExternalKeyboard();
         followScreenLanguage();
-        syncIndicator();
         syncOldPalette();
         syncSwipeMarks();
+        syncKeyboardOverlay();
     });
     timer->start(1500);
     qWarning("[hangul] filter installed");
@@ -1116,3 +1225,8 @@ void init() {
 } // namespace
 
 void rmpplang::hangulInit() { init(); }
+
+// The bar over keyboards that have no format bar (see kKeyboardQml); nullptr until the keyboard was shown.
+QQuickItem *rmpplang::keyboardBar() {
+    return g_keyboardOverlay ? g_keyboardOverlay->property("host").value<QQuickItem *>() : nullptr;
+}

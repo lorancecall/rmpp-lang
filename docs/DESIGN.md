@@ -157,8 +157,19 @@ A per-script fallback cannot change Latin (the family has those glyphs), so rmpp
 The Korean keyboard is rmpp-korean's code: the Hangul composition engine (`src/hangul.cpp`) stays in the core
 and is active while the input language's manifest says `input=compose:hangul` (`languages/ko`); the `ko_KR`
 on-screen layout comes with the add-on (`ko.rcc`), the 한 label from its `label=`. `keyboard.ko=0` turns off
-physical-keyboard switching and the indicator for it. Which on-screen languages the globe key cycles through
-stays xochitl's own setting (Settings > Language & keyboard), where Korean appears because the layout is registered.
+physical-keyboard switching and the indicator for it. Which on-screen layouts exist stays xochitl's own setting
+(Settings > Language & keyboard), where Korean appears because the layout is registered.
+
+**The language key** is rmpp-lang's, in one place for every text field: a 한 / EN key laid over the keyboard's
+globe key (bottom left; xochitl shows the globe key when two or more layouts are on). It cycles rmpp-lang's
+languages in Settings order (as Ctrl+Space and right Alt do) and shows the current one; the globe key would cycle
+only xochitl's layouts. With one layout there is no globe key, and the key sits above the keys at the right. It is
+hidden on passcode / PIN screens. The format bar no longer carries a language button.
+
+**Keyboards without the format bar** (rmpp-textobj's edit box, other add-ons' fields, dialogs open the keyboard
+without xochitl's format bar): rmpp-lang shows a bar of the format bar's height above the keys while the language
+needs it, and the conversion button with its candidate bar (漢 / 変 / 汉) and the 옛 palette attach to it as to the
+format bar (`syncKeyboardOverlay` in `hangul.cpp`, `keyboardBar()`).
 
 Adding a keyboard:
 
@@ -175,7 +186,7 @@ Adding a keyboard:
 
 ### Hanja conversion
 
-- **Trigger**: the 漢 button on the keyboard's format bar (left of the language indicator, shown while the input
+- **Trigger**: the 漢 button on the keyboard's format bar (or rmpp-lang's bar where there is none; shown while the input
   language has `convert=hanja`), or the Hanja key / F9 of a physical keyboard.
 - **What is converted**: the selection if there is one (a word of up to 8 syllables), else the Hangul syllables
   right before the cursor: candidates for the longest run first (한국어 -> 韓國語), then shorter ones down to the
@@ -341,7 +352,7 @@ rtl=0                      # 1 = right-to-left (the Settings page warns that edi
 font=                      # default family ("" = device default); the user can pick another
 families=Noto Sans         # device families worth offering besides the add-on's fonts (comma-separated)
 default=0                  # 1 = preselected in the installer menu
-label=                     # indicator text on the format bar ("" = the code in capitals; ko: 한)
+label=                     # text of the language key ("" = the code in capitals; ko: 한)
 keyboard_name=ЙЦУКЕН       # how Settings names the layout ("" = the layout ids)
 sample=Здравствуйте, хорошего дня · 123   # Settings sample line in the chosen font
 sample_plain=              # shown instead for fonts that cannot render `sample` (missing glyphs, uncomposed old

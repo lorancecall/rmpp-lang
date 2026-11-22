@@ -529,7 +529,8 @@ protected:
 
 // ---- format bar ----
 
-// "漢" button left of the language indicator, and the candidate bar over the rest of the format bar.
+// "漢" button next to the bar's right end (where the language indicator was), and the candidate bar over the rest
+// of the bar. The same positions on the format bar and on rmpp-lang's bar over keyboards without one.
 const char *kHanjaQml = R"QML(
 import QtQuick
 Item {
@@ -540,7 +541,7 @@ Item {
     // Cells as wide as their word (食べます, 中国人), pages filled greedily to the room on the bar.
     FontMetrics { id: fm; font.pixelSize: 32 }
     function cellWidth(c) { return Math.min(420, Math.max(144, Math.ceil(fm.advanceWidth(c.h)) + 32)); }
-    readonly property real room: Math.max(300, width - 200 - 76 - 12 - 16 - 2 * (56 + 6))
+    readonly property real room: Math.max(300, width - 152 - 76 - 12 - 16 - 2 * (56 + 6))
     readonly property var pages: {
         const out = [0];
         let used = 0;
@@ -561,7 +562,8 @@ Item {
     Rectangle {
         id: button
         width: 76; height: 56; radius: 10
-        anchors.right: parent.right; anchors.rightMargin: 200
+        // 152: about 30 px clear of the close button's press outline (108 px wide, from x 1498 on a 1620 px bar)
+        anchors.right: parent.right; anchors.rightMargin: 152
         anchors.verticalCenter: parent.verticalCenter
         visible: !!hanja.available
         color: hanja.open ? "white" : "black"
@@ -646,31 +648,34 @@ QQuickItem *findByClassPrefix(QQuickItem *root, const char *prefix, int depth = 
     return nullptr;
 }
 
-void syncBar() {
-    for (QWindow *w : QGuiApplication::allWindows()) {
-        auto *qw = qobject_cast<QQuickWindow *>(w);
-        if (!qw) continue;
-        QQuickItem *bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
-        if (!bar || bar->property("_hanjaBar").toBool()) continue;
-        bar->setProperty("_hanjaBar", true);
-        QQmlEngine *eng = qmlEngine(bar);
-        if (!eng) continue;
-        auto *ctx = new QQmlContext(eng->rootContext(), bar);
-        ctx->setContextProperty(QStringLiteral("hanja"), g_map);
-        QQmlComponent comp(eng);
-        comp.setData(QByteArray(kHanjaQml), QUrl(QStringLiteral("qrc:/hanja/HanjaBar.qml")));
-        QObject *o = comp.beginCreate(ctx);
-        auto *item = qobject_cast<QQuickItem *>(o);
-        if (!item) {
-            for (const auto &e : comp.errors()) qWarning("[hanja] %s", qPrintable(e.toString()));
-            delete o;
-            continue;
-        }
-        item->setParentItem(bar);
-        item->setParent(bar);
-        comp.completeCreate();
-        qWarning("[hanja] button added to the format bar");
+void attachBar(QQuickItem *bar, const char *where) {
+    if (!bar || bar->property("_hanjaBar").toBool()) return;
+    QQmlEngine *eng = qmlEngine(bar);
+    if (!eng) return;
+    bar->setProperty("_hanjaBar", true);
+    auto *ctx = new QQmlContext(eng->rootContext(), bar);
+    ctx->setContextProperty(QStringLiteral("hanja"), g_map);
+    QQmlComponent comp(eng);
+    comp.setData(QByteArray(kHanjaQml), QUrl(QStringLiteral("qrc:/hanja/HanjaBar.qml")));
+    QObject *o = comp.beginCreate(ctx);
+    auto *item = qobject_cast<QQuickItem *>(o);
+    if (!item) {
+        for (const auto &e : comp.errors()) qWarning("[hanja] %s", qPrintable(e.toString()));
+        delete o;
+        return;
     }
+    item->setParentItem(bar);
+    item->setParent(bar);
+    comp.completeCreate();
+    qWarning("[hanja] button added to the %s", where);
+}
+
+// The format bar of notebooks, and rmpp-lang's own bar over keyboards that have none (hangul.cpp).
+void syncBar() {
+    for (QWindow *w : QGuiApplication::allWindows())
+        if (auto *qw = qobject_cast<QQuickWindow *>(w))
+            attachBar(findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard"), "format bar");
+    attachBar(rmpplang::keyboardBar(), "keyboard bar");
 }
 
 void onCommand(const QString &cmd) {
@@ -682,6 +687,8 @@ void onCommand(const QString &cmd) {
 }
 
 } // namespace
+
+QObject *rmpplang::hanjaState() { return g_map; }
 
 void rmpplang::hanjaInit() {
     auto *app = QCoreApplication::instance();
