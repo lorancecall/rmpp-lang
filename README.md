@@ -123,8 +123,9 @@ ADDONS="ko ru" sh deploy.sh rmpp       # development install over ssh (host alia
 sh deploy.sh rmpp --remove             # remove it again
 ```
 
-Each add-on also carries `glyphs.rmgl`, pen strokes of its font for text that rmpp-hwr writes as ink. They are
-committed; rebuild one after changing its `glyph_font` / `glyph_chars` (needs Python with numpy, Pillow, fontTools):
+Each add-on also carries `glyphs.rmgl`, pen strokes of its font for text written as ink (rmpp-textobj, rmpp-hwr);
+every non-ASCII glyph lives in these files. They are committed; rebuild one after changing its `glyph_font` /
+`glyph_chars` (needs Python with numpy, Pillow, fontTools):
 `python3 tools/glyphs/glyphs.py build zh` (see "Glyph files" in DESIGN.md).
 
 Never run `systemctl stop xochitl` on the device: stopping it powers the tablet off. More than four xochitl
