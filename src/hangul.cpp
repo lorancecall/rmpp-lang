@@ -1072,6 +1072,67 @@ void syncSwipeMarks() {
     qWarning("[hangul] swipe marks added over the keyboard");
 }
 
+// The same 한 / EN badge for keyboards opened without the format bar (text fields of other add-ons, such as
+// rmpp-textobj's edit box, and xochitl's own dialogs): it sits just above the keys, at the right, while no format
+// bar is shown. "bar" is the format bar once it exists (it can be created after the keyboard).
+const char *kPanelBadgeQml = R"QML(
+import QtQuick
+Rectangle {
+    id: b
+    property Item vk
+    property Item bar
+    readonly property real s: vk ? vk.width / 1620 : 1
+    width: 76 * s; height: 56 * s; radius: 10 * s
+    x: vk ? vk.x + vk.width - width - 24 * s : 0
+    y: vk ? vk.y - height - 12 * s : 0
+    z: 60
+    visible: !!hangul.enabled && !!vk && vk.visible && vk.height > 0 && !(bar && bar.visible && bar.height > 0)
+    color: hangul.label !== "EN" ? "white" : "black"
+    border.color: "black"; border.width: 2
+    Text {
+        anchors.centerIn: parent
+        text: hangul.label || "EN"
+        color: hangul.label !== "EN" ? "black" : "white"
+        font.pixelSize: 30 * b.s; font.bold: true
+    }
+    MouseArea { anchors.fill: parent; anchors.margins: -8; onClicked: hangul.command = "toggle#" + Date.now() }
+}
+)QML";
+
+QPointer<QQuickItem> g_panelBadge;
+
+void syncPanelBadge() {
+    QQuickItem *panel = findKeyboardPanel();
+    QQuickItem *vk = panel ? findItemOfClass(panel, "VirtualKeyboard") : nullptr;
+    if (!vk || !vk->parentItem()) return;
+    if (!g_panelBadge) {
+        QQmlEngine *eng = qmlEngine(vk);
+        if (!eng) eng = qmlEngine(panel);
+        if (!eng) return;
+        auto *ctx = new QQmlContext(eng->rootContext(), vk);
+        ctx->setContextProperty(QStringLiteral("hangul"), g_state);
+        QQmlComponent comp(eng);
+        comp.setData(QByteArray(kPanelBadgeQml), QUrl(QStringLiteral("qrc:/hangul/PanelIndicator.qml")));
+        QObject *o = comp.beginCreate(ctx);
+        auto *item = qobject_cast<QQuickItem *>(o);
+        if (!item) {
+            for (const auto &e : comp.errors()) qWarning("[hangul] %s", qPrintable(e.toString()));
+            delete o;
+            return;
+        }
+        item->setProperty("vk", QVariant::fromValue(vk));
+        item->setParentItem(vk->parentItem());
+        item->setParent(vk);
+        comp.completeCreate();
+        g_panelBadge = item;
+        qWarning("[hangul] indicator added over the keyboard (for fields without the format bar)");
+    }
+    // the format bar: in the same window as the keyboard
+    QQuickItem *bar = nullptr;
+    if (QQuickWindow *qw = vk->window()) bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
+    if (g_panelBadge->property("bar").value<QQuickItem *>() != bar) g_panelBadge->setProperty("bar", QVariant::fromValue(bar));
+}
+
 void init() {
     auto *app = QCoreApplication::instance();
     auto *filter = new HangulFilter(app);
@@ -1108,6 +1169,7 @@ void init() {
         syncIndicator();
         syncOldPalette();
         syncSwipeMarks();
+        syncPanelBadge();
     });
     timer->start(1500);
     qWarning("[hangul] filter installed");
