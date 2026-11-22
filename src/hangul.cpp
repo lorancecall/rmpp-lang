@@ -1081,12 +1081,14 @@ Rectangle {
     id: b
     property Item vk
     property Item bar
+    property bool secret: false     // a passcode / PIN field has the focus
     readonly property real s: vk ? vk.width / 1620 : 1
     width: 76 * s; height: 56 * s; radius: 10 * s
     x: vk ? vk.x + vk.width - width - 24 * s : 0
     y: vk ? vk.y - height - 12 * s : 0
     z: 60
-    visible: !!hangul.enabled && !!vk && vk.visible && vk.height > 0 && !(bar && bar.visible && bar.height > 0)
+    visible: !!hangul.enabled && !!vk && vk.visible && vk.height > 0 && !secret
+             && !(bar && bar.visible && bar.height > 0)
     color: hangul.label !== "EN" ? "white" : "black"
     border.color: "black"; border.width: 2
     Text {
@@ -1131,6 +1133,17 @@ void syncPanelBadge() {
     QQuickItem *bar = nullptr;
     if (QQuickWindow *qw = vk->window()) bar = findByClassPrefix(qw->contentItem(), "FormatMenuVirtualKeyboard");
     if (g_panelBadge->property("bar").value<QQuickItem *>() != bar) g_panelBadge->setProperty("bar", QVariant::fromValue(bar));
+    // never on the passcode / PIN screens (as rmpp-textobj: class names with Passcode, Pincode, PinKeyboard)
+    bool secret = false;
+    for (QWindow *w : QGuiApplication::allWindows()) {
+        auto *qw = qobject_cast<QQuickWindow *>(w);
+        if (!qw || !qw->isVisible()) continue;
+        for (QQuickItem *i = qw->activeFocusItem(); i && !secret; i = i->parentItem()) {
+            const QByteArray c = i->metaObject()->className();
+            secret = c.contains("Passcode") || c.contains("Pincode") || c.contains("PinKeyboard");
+        }
+    }
+    if (g_panelBadge->property("secret").toBool() != secret) g_panelBadge->setProperty("secret", secret);
 }
 
 void init() {
