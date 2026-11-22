@@ -30,9 +30,11 @@ English is always there. More languages are welcome: see [Add a language](docs/F
 
 ## Install
 
-- Install **rmpp setup** (desktop app or one-line script) from
-  [rmpp-packages](https://github.com/lorancecall/rmpp-packages#install) and tick **Languages** (selected by default,
-  with Korean), then the languages you want. Developer mode is needed: the rmpp-packages page explains it.
+Start at **[rmpp-packages](https://github.com/lorancecall/rmpp-packages#install)**: it explains developer mode and
+has **rmpp setup**, the installer for all rmpp add-ons.
+
+- In rmpp setup, tick **Languages: keyboards and fonts per language** (rmpp-lang; selected by default, with
+  Korean), then the languages you want.
 - After a reMarkable OS update: **Restore** in rmpp setup.
 - Other ways (Vellum on the command line, building and installing it yourself) and removal:
   [docs/install.md](docs/install.md).
