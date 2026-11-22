@@ -25,7 +25,9 @@ def run(args, **kw):
 
 def tablet(host, args):
     """Run the tablet's rmpp-lang with these arguments."""
-    return run(["ssh", host, "rmpp-lang " + " ".join(shlex.quote(a) for a in args)]).returncode
+    # The command is in rmpp-lang's folder (/usr/lib/rmpp/rmpp-lang), which is not on the ssh PATH.
+    return run(["ssh", host, "PATH=/usr/lib/rmpp/rmpp-lang:$PATH rmpp-lang "
+                + " ".join(shlex.quote(a) for a in args)]).returncode
 
 
 def upload_and_add(host, files, rest):

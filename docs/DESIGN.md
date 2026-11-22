@@ -24,16 +24,20 @@ on); add-ons `ko`, `ja`, `zh`, `ru`, ... (rmpp-hwr uses the same codes).
 
 | Piece | Where | What |
 |---|---|---|
-| `librmpp-lang.so` | `/usr/lib/rmpp-lang/`, linked as `/usr/lib/rmpp-preload.d/50-rmpp-lang.so` | Loaded into xochitl by rmpp-preload. `lang.cpp`: settings, fonts, add-ons, Settings page; `hangul.cpp`: Hangul composition (used by the ko add-on). |
-| `rmpp-lang.rcc` | `/usr/lib/rmpp-lang/` | QML of the Settings page and its icon. (On-screen layouts come with the add-ons.) |
-| `rmpp-lang` | `/usr/bin/rmpp-lang` | Tablet command (POSIX sh): languages, keyboards, fonts, probe. |
+| `librmpp-lang.so` | `/usr/lib/rmpp/rmpp-lang/`, linked as `/usr/lib/rmpp/preload.d/50-rmpp-lang.so` | Loaded into xochitl by rmpp-preload. `lang.cpp`: settings, fonts, add-ons, Settings page; `hangul.cpp`: Hangul composition (used by the ko add-on). |
+| `rmpp-lang.rcc` | `/usr/lib/rmpp/rmpp-lang/` (path in `RMPPLANG_RCC`, set by rmpp-preload's `env.d`; same default) | QML of the Settings page and its icon. (On-screen layouts come with the add-ons.) |
+| `rmpp-lang` | `/usr/lib/rmpp/rmpp-lang/rmpp-lang` | Tablet command (POSIX sh): languages, keyboards, fonts, probe. |
 | `tools/rmpp-lang.py` | computer | Same commands over ssh; uploads font files; fetches OFL families from google/fonts. |
 | `lang.conf` | `/home/root/.config/rmpp-lang/lang.conf` | Settings, `key=value`. Written by the Settings page and the command. |
 | `state.json` | `/home/root/.config/rmpp-lang/state.json` | What the add-on applied (for rmpp-hwr and the command). |
 | fonts | `/home/root/.local/share/fonts/rmpp-lang/<code>/*.ttf\|otf\|ttc` | One folder per language. |
 
-The library and resources must be in `/usr/lib` (xochitl starts before `/home` is mounted); everything the user
-changes lives in `/home` and survives OS updates. The add-on polls the settings file and the font folders every
+The library and resources must be on the root file system: xochitl starts before the encrypted `/home` is
+mounted (3.6 s vs 14.5 s on OS 3.29.1), and ordering xochitl after `home.mount` hangs the boot on the logo (the
+tablet then falls back to the other OS partition). Since 0.3.2 every rmpp root-fs file is under one folder,
+`/usr/lib/rmpp/` (rmpp-lang in `/usr/lib/rmpp/rmpp-lang/`); the only file outside it is rmpp-preload's xochitl
+drop-in. Up to 0.3.1 they were in `/usr/lib/rmpp-lang` and `/usr/bin/rmpp-lang`. Everything the user changes
+lives in `/home` and survives OS updates. The add-on polls the settings file and the font folders every
 1.5 s, so the command, the PC tool, a file copied over USB/ssh and the Settings page all take effect the same way.
 
 ### lang.conf
@@ -379,9 +383,9 @@ https://github.com/notofonts/noto-cjk/raw/<commit>/Sans/OTF/Japanese/NotoSansCJK
 | What | Path | Why there |
 |---|---|---|
 | Manifest, keymap, fonts | `/home/root/.local/share/rmpp-lang/languages/<code>/` (`language.conf`, `keymap.conf`, `fonts/*`) | Package files in /home survive OS updates. |
-| On-screen layouts | `/usr/lib/rmpp-lang/languages/<code>.rcc` (copied by postinstall / postupgrade / reenable from `/home/root/.vellum/share/rmpp-lang-<code>/<code>.rcc`) | xochitl starts before /home is mounted; layouts must be registered at startup. The package build makes it with `rcc` from `keyboards/` (prefix `/`, files `misc/keyboards/<layout>/keyboard_layout.json`). |
+| On-screen layouts | `/usr/lib/rmpp/rmpp-lang/languages/<code>.rcc` (`languages/` next to `RMPPLANG_RCC`; copied by postinstall / postupgrade / reenable from the package's copy in `/home/root/.vellum/share/`) | xochitl starts before /home is mounted; layouts must be registered at startup. The package build makes it with `rcc` from `keyboards/` (prefix `/`, files `misc/keyboards/<layout>/keyboard_layout.json`). Up to 0.3.1: `/usr/lib/rmpp-lang/languages/`. |
 
-The core registers every `/usr/lib/rmpp-lang/languages/*.rcc` at startup, and lists every
+The core registers every `<code>.rcc` in `languages/` next to `rmpp-lang.rcc` at startup, and lists every
 `/home/root/.local/share/rmpp-lang/languages/*/language.conf` (polled with the other files, so an add-on installed
 or removed shows up in Settings > Languages within seconds; a new on-screen layout needs one xochitl restart,
 which the package does anyway). Fonts in an add-on's `fonts/` are registered like user fonts; user fonts keep
@@ -392,13 +396,13 @@ their own folder (`/home/root/.local/share/fonts/rmpp-lang/<code>/`). A newly in
 Physical keyboards: Ctrl+Space / right Alt cycle through the enabled languages that have `input` other than
 `none` (with only Korean on, this is today's Korean/English toggle); the indicator shows the language's label.
 
-### Packaging (rmpp-packages CI, proposal)
+### Packaging (rmpp-packages `scripts/lang-addons.py`)
 
 For each `languages/<code>/` of a tagged rmpp-lang release: `pkgname=rmpp-lang-<code>`, `pkgver=` the manifest
 `version`, `depends="rmpp-lang>=<min_core>"`, `pkgdesc=` `summary_en`, license GPL-3.0-only plus the fonts'
 license. Files: the folder minus `keyboards/` and `fonts.conf`, plus downloaded fonts (checked against SHA-256) and
-`<code>.rcc`. postinstall/postupgrade/reenable copy the rcc to `/usr/lib/rmpp-lang/languages/`, run
-`rmpp-lang lang on <code>` (postinstall only) and restart xochitl if a layout was added; preremove deletes the rcc.
+`<code>.rcc`. postinstall/postupgrade/reenable copy the rcc to `/usr/lib/rmpp/rmpp-lang/languages/`, postinstall
+runs `rmpp-lang lang on <code>`; xochitl restarts only when a layout was added or removed; preremove deletes the rcc.
 
 ## Settings > Languages
 

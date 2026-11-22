@@ -65,7 +65,16 @@ const QString kProbeOut = QStringLiteral("/tmp/rmpp-lang-probe.txt");
 const QString kFontRoot = QStringLiteral("/home/root/.local/share/fonts/rmpp-lang");
 
 const QString kAddonRoot = QStringLiteral("/home/root/.local/share/rmpp-lang/languages");   // manifests, keymaps, fonts
-const QString kAddonRcc = QStringLiteral("/usr/lib/rmpp-lang/languages");                 // <code>.rcc (layouts)
+// The core's files live in /usr/lib/rmpp/rmpp-lang/ (rmpp-preload's one-folder layout): xochitl starts seconds
+// before the encrypted /home is mounted, so nothing it needs at startup may be in /home. RMPPLANG_RCC (set by
+// rmpp-preload's env.d) may point elsewhere for hand-made installs.
+QString coreRcc() {
+    return qEnvironmentVariable("RMPPLANG_RCC", QStringLiteral("/usr/lib/rmpp/rmpp-lang/rmpp-lang.rcc"));
+}
+// <code>.rcc (layouts of the add-ons): "languages" next to rmpp-lang.rcc.
+QString addonRccDir() {
+    return QFileInfo(coreRcc()).absolutePath() + QStringLiteral("/languages");
+}
 
 // A language: built into the core (ko, en, latin) or an add-on described by languages/<code>/language.conf.
 struct Lang {
@@ -234,7 +243,7 @@ qint64 addonStamp() {
 
 // On-screen layouts of add-ons: registered at startup (they must exist when xochitl reads its keyboard list).
 void registerAddonLayouts() {
-    for (const QFileInfo &fi : QDir(kAddonRcc).entryInfoList({QStringLiteral("*.rcc")}, QDir::Files)) {
+    for (const QFileInfo &fi : QDir(addonRccDir()).entryInfoList({QStringLiteral("*.rcc")}, QDir::Files)) {
         const bool ok = QResource::registerResource(fi.absoluteFilePath());
         qWarning("[rmpp-lang] layouts %s: %s", qPrintable(fi.fileName()), ok ? "registered" : "FAILED");
     }
@@ -1024,7 +1033,7 @@ void poll() {
 }
 
 void init() {
-    const QString rcc = qEnvironmentVariable("RMPPLANG_RCC", QStringLiteral("/usr/lib/rmpp-lang/rmpp-lang.rcc"));
+    const QString rcc = coreRcc();
     const bool ok = QResource::registerResource(rcc);
     qWarning("[rmpp-lang] resources %s: %s", qPrintable(rcc), ok ? "registered" : "FAILED");
     g_trace = QFileInfo::exists(kTraceFlag);   // /home may not be mounted yet: poll() checks again

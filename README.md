@@ -96,16 +96,19 @@ rmpp-lang writes `/home/root/.config/rmpp-lang/state.json` (languages, order, ke
 
 ## How it works
 
-`librmpp-lang.so` is loaded into xochitl at boot by `rmpp-preload` (a launcher that adds
-`/usr/lib/rmpp-preload.d/*.so` to `LD_PRELOAD`, after xovi's if xovi is in use). It finds the language add-ons in
+`librmpp-lang.so` is loaded into xochitl at boot by `rmpp-preload` (a launcher that adds the add-ons in its
+`preload.d/` to `LD_PRELOAD`, after xovi's if xovi is in use). It finds the language add-ons in
 `/home/root/.local/share/rmpp-lang/languages/`, registers their on-screen layouts (`<code>.rcc`) next to the
 built-in ones, sets one fallback font per script with `QFontDatabase::setApplicationFallbackFontFamilies`, maps
 physical-keyboard keys per language, and composes Hangul for add-ons with `input=compose:hangul`. The Settings page
 is QML from `rmpp-lang.rcc`.
 
-xochitl starts before `/home` is mounted, so the library and the layouts live in `/usr/lib/rmpp-lang`. The root
-file system is read-only and an OS update replaces it, which is why the packages restore these files with
-`vellum reenable`. Design, add-on format and tablet findings: [docs/DESIGN.md](docs/DESIGN.md).
+xochitl starts seconds before the encrypted `/home` is mounted, so what it needs at startup (the library,
+`rmpp-lang.rcc`, the add-ons' layouts) is on the root file system, in one folder: `/usr/lib/rmpp/rmpp-lang/`,
+with the `rmpp-lang` command. Settings, fonts and the add-ons' data are in `/home` (`/home/root/.config/rmpp-lang`,
+`/home/root/.local/share`). The root file system is read-only and an OS update replaces it, which is why the
+packages put these files back with `vellum reenable`. Design, add-on format and tablet findings:
+[docs/DESIGN.md](docs/DESIGN.md).
 
 ## Build
 
