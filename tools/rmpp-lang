@@ -1,5 +1,6 @@
 #!/bin/sh
-# rmpp-lang: languages and fonts on the tablet (installed as /usr/bin/rmpp-lang).
+# rmpp-lang: languages and fonts on the tablet (installed as /home/root/.vellum/share/rmpp-lang/rmpp-lang,
+# linked from /home/root/.vellum/bin/rmpp-lang).
 # The xochitl add-on picks up changes to the settings file and the font folders within a few seconds.
 CONF_DIR=/home/root/.config/rmpp-lang
 CONF=$CONF_DIR/lang.conf

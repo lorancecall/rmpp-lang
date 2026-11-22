@@ -25,7 +25,9 @@ def run(args, **kw):
 
 def tablet(host, args):
     """Run the tablet's rmpp-lang with these arguments."""
-    return run(["ssh", host, "rmpp-lang " + " ".join(shlex.quote(a) for a in args)]).returncode
+    # Vellum's bin folder (where the package links the command) is not on a non-interactive ssh PATH.
+    return run(["ssh", host, "PATH=/home/root/.vellum/bin:$PATH rmpp-lang "
+                + " ".join(shlex.quote(a) for a in args)]).returncode
 
 
 def upload_and_add(host, files, rest):
