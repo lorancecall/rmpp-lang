@@ -921,10 +921,12 @@ protected:
                 && panel->mapRectToScene(QRectF(0, 0, panel->width(), panel->height())).contains(p);
             g_touchBeginMs = onKeys ? QDateTime::currentMSecsSinceEpoch() : -1;
             start = p;
-            if (onKeys) {   // the Shift key (bottom-left key) touched: Shift is the user's own
+            if (onKeys) {   // the Shift key (left end of the third row) touched: Shift is the user's own
+                // Rows from the keyboard's bottom edge: bottom row centre 78 px up, Shift row centre ~213 px up.
+                // The band stops above the bottom row, so a tap on the language key's top edge is no Shift touch.
                 const QPointF k = panel->mapFromScene(p);
                 const qreal sc = panel->width() / 1620.0;
-                if (k.x() < 215 * sc && k.y() > panel->height() - 300 * sc && k.y() < panel->height() - 120 * sc)
+                if (k.x() < 215 * sc && k.y() > panel->height() - 275 * sc && k.y() < panel->height() - 150 * sc)
                     g_state->insert(QStringLiteral("userShift"), double(QDateTime::currentMSecsSinceEpoch()));
             }
             return false;
@@ -959,20 +961,35 @@ Item {
     visible: !!hangul.old && !!vk && vk.visible && vk.language === "ko_KR" && !vk.symbolsSelected && !vk.shiftSelected
     readonly property real s: width / 1620
     // No automatic Shift for Korean, Japanese, Chinese (developer's request; the keyboard ignores
-    // Qt::ImhNoAutoUppercase): Shift turned on without a touch on the Shift key goes off again.
-    function noAutoShift() {
-        if (vk && vk.shiftSelected && hangul.caseless && Date.now() - (hangul.userShift || 0) > 1500)
+    // Qt::ImhNoAutoUppercase): Shift turned on without a touch on the Shift key goes off again. A switch to such a
+    // language always clears Shift, also the user's own from the language before (Shift in Hangul is ㅃ ㅉ ㄸ ㄲ ㅆ).
+    // Checked again shortly after, for a Shift the keyboard sets after its change signal.
+    function noAutoShift(force) {
+        if (vk && vk.shiftSelected && hangul.caseless && (force || Date.now() - (hangul.userShift || 0) > 1500))
             vk.shiftSelected = false;
     }
+    function check(force) {
+        noAutoShift(force);
+        if (force) recheck.force = true;
+        recheck.restart();
+    }
+    Timer {
+        id: recheck
+        property bool force: false
+        interval: 250
+        onTriggered: { m.noAutoShift(force); force = false; }
+    }
+    Component.onCompleted: check(false)
+    onVkChanged: check(false)
     Connections {
         target: m.vk
-        function onShiftSelectedChanged() { m.noAutoShift(); }
-        function onVisibleChanged() { m.noAutoShift(); }
-        function onLanguageChanged() { m.noAutoShift(); }
+        function onShiftSelectedChanged() { m.check(false); }
+        function onVisibleChanged() { m.check(false); }
+        function onLanguageChanged() { m.check(true); }
     }
     Connections {
         target: hangul
-        function onValueChanged(key, value) { if (key === "caseless") m.noAutoShift(); }
+        function onValueChanged(key, value) { if (key === "caseless") m.check(true); }
     }
     // [row, index in row, left, right, up]
     readonly property var keys: [
