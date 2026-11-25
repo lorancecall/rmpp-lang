@@ -1,8 +1,8 @@
 # rmpp-lang
 
-![Typing Korean on the Paper Pro: jamo compose into 한국어, 漢 turns it into 韓國語, a swipe types the Old Hangul ㆍ](docs/rmpp-lang-demo.gif)
+![Typing on the Paper Pro: jamo compose into 한국어, 漢 turns it into 韓國語, the language key left of the space bar switches to Russian and English and back, a swipe types the Old Hangul ㆍ](docs/rmpp-lang-demo.gif)
 
-*Korean on the on-screen keyboard: Hangul, Hanja conversion and Old Hangul (recorded on the Paper Pro with [rmpp-studio](https://github.com/lorancecall/rmpp-studio)).*
+*The on-screen keyboard: Hangul, Hanja conversion, the language key and Old Hangul (recorded on the Paper Pro with [rmpp-studio](https://github.com/lorancecall/rmpp-studio)).*
 
 Languages for the reMarkable Paper Pro: a keyboard and a font for each language (Korean with Old Hangul, Japanese,
 Chinese, Russian, ...), on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs without xovi
