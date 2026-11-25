@@ -5,10 +5,8 @@
 *The on-screen keyboard: Hangul, Hanja conversion, the language key and Old Hangul (recorded on the Paper Pro with [rmpp-studio](https://github.com/lorancecall/rmpp-studio)).*
 
 Languages for the reMarkable Paper Pro: a keyboard and a font for each language (Korean with Old Hangul, Japanese,
-Chinese, Russian, ...), on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs without xovi
-and keeps working after a reboot.
-
-Tested on reMarkable Paper Pro, OS 3.29.1.
+Chinese, Russian, Bulgarian, ...), on the on-screen keyboard and on Type Folio, Bluetooth and USB keyboards. Runs
+without xovi and keeps working after a reboot.
 
 Made for and tested on the reMarkable Paper Pro with OS 3.29. Other reMarkable models are not supported.
 Updates for newer OS versions may take some time to follow.
@@ -41,33 +39,33 @@ has **rmpp setup**, the installer for all rmpp add-ons.
 - It installs `rmpp-preload` with it; each language (`rmpp-lang-<code>`) installs `rmpp-lang`, and Japanese and
   Chinese also install `rmpp-lang-ko` ([all packages and dependencies](https://github.com/lorancecall/rmpp-packages/blob/main/docs/packages.md)).
 - After a reMarkable OS update: **Restore** in rmpp setup.
-- Without rmpp setup, removing it, next to other mods, building it: [docs/install.md](docs/install.md).
+- Installing without rmpp setup, uninstalling, using it next to other mods, and building: [docs/install.md](docs/install.md).
 
 ## Use
 
-- **Settings > Languages** (above Handwriting): the installed languages in keyboard order (▲▼ to reorder), and a
-  page per language to turn its keyboard on or off and choose its font, with a sample line.
-- **On-screen keyboard:** turn the language on in Settings > Language & keyboard, then switch with the language
-  key (bottom left, where the globe key was).
-  Korean jamo join into syllables as you type (ㅎ ㅏ ㄴ → 한); backspace removes one jamo at a time; Shift gives
-  ㅃ ㅉ ㄸ ㄲ ㅆ ㅒ ㅖ.
+Two settings pages are involved: **Settings > Language & keyboard** is reMarkable's own and decides which on-screen
+layouts are on; **Settings > Languages** (above Handwriting) is rmpp-lang's.
+
+- **Settings > Languages:** the installed languages in keyboard order (▲▼ to reorder), and a page per language to
+  turn its keyboard on or off and choose its font, with a sample line.
+- **On-screen keyboard:** turn the language's layout on in Settings > Language & keyboard. Korean jamo join into
+  syllables as you type (ㅎ ㅏ ㄴ → 한); backspace removes one jamo at a time; Shift gives ㅃ ㅉ ㄸ ㄲ ㅆ ㅒ ㅖ.
+- **Language key:** the bottom-left key of the on-screen keyboard (where the globe key was) shows the current
+  language (EN, 한, RU, ...); tap it to switch, in Settings > Languages order. It is the same in every text field,
+  with or without the format bar. In fields without the format bar (text objects, dialogs) a bar of the same kind
+  appears above the keys while the language needs it: 漢 / 変 / 汉 and their candidates, 옛.
 - **Type Folio, Bluetooth and USB keyboards:** **Ctrl+Space** or **right Alt / right Cmd** cycles through English
   and the languages with a keyboard, in Settings order. The on-screen keyboard follows.
 - **Hanja (Korean):** tap **漢** on the format bar, or press the Hanja key or **F9**, to turn the Hangul before
   the cursor (or the selected word) into Hanja: pick from the candidates (1-9 on a physical keyboard).
 - **Old Hangul (옛한글):** turn on Settings > Languages > Korean > Old Hangul, then the **옛** button on the format
   bar types ㆍ ㅿ ㆆ ㆁ ㅸ, old initial clusters and the tone dots (방점); they compose with the keyboard (ᄆᆞᆯᄊᆞᆷ).
-- **Japanese:** turn on the Japanese keyboard in Settings > Languages, switch to it (日) and type romaji on the
-  Latin keys: `nihongo`, then Space (or **変** / F9) converts to 日本語; Space picks the first candidate. Also
-  supported, by sound in Hangul on the Korean keyboard: 니혼고 -> 日本語, 다베마스 -> 食べます. Choose in Settings >
-  Languages > Japanese > Input.
+- **Japanese:** turn on the Japanese keyboard, switch to it (日) and type romaji on the Latin keys: `nihongo`, then
+  Space (or **変** / F9) converts to 日本語; Space picks the first candidate. Also supported, by sound in Hangul on
+  the Korean keyboard: 니혼고 -> 日本語, 다베마스 -> 食べます. Choose in Settings > Languages > Japanese > Input.
 - **Chinese:** switch to Chinese (中) and type pinyin: `zhongguo`, then Space (or **汉**) converts to 中国, with
   predictions. Also supported: Mandarin by sound in Hangul (중궈 -> 中国, 베이징 -> 北京) or Korean Hanja readings
   (중국 -> 中国 / 中國). Choose in Settings > Languages > Chinese > Input.
-- **Language key:** the bottom-left key of the on-screen keyboard shows the current language (EN, 한, RU, ...);
-  tap it to switch, in Settings > Languages order. It is the same in every text field, with or without the format
-  bar. In fields without the format bar (text objects, dialogs) a bar of the same kind appears above the keys while
-  the language needs it: 漢 / 変 / 汉 and their candidates, 옛.
 - **External keyboards:** while a Bluetooth or USB keyboard is connected, the on-screen keys fold away and the
   format bar stays. With [rmpp-bt](https://github.com/lorancecall/rmpp-bt) you can set a keyboard to **Type Folio
   mode** instead.
@@ -115,8 +113,7 @@ Building, the development install and the glyph files: [docs/install.md](docs/in
 
 ## History
 
-rmpp-lang grew out of rmpp-korean 0.1.0 (Korean keyboard and fonts). There is no upgrade path: remove rmpp-korean
-(`vellum del rmpp-korean`) and install rmpp-lang with `rmpp-lang-ko`. See [docs/MIGRATION.md](docs/MIGRATION.md).
+rmpp-lang grew out of rmpp-korean 0.1.0: [docs/MIGRATION.md](docs/MIGRATION.md).
 
 ## New languages
 
